@@ -34,9 +34,9 @@ To install all the required packages, instead, run the following commands:
 
 ```bash
 # Create anaconda environment (skip cudatoolkit option if you don't want to use the GPU)
-conda create -n gibbstr python= cudatoolkit=
+conda create -n parkison python=3.10 cudatoolkit=11.3
 # Activate anaconda environment
-conda activate gibbstr
+conda activate parkison
 # Install packages
 ```
 
