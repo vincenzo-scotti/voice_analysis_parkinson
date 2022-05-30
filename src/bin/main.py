@@ -30,8 +30,8 @@ def main(args: Namespace):
             # Log results
 
             # Get target language features
-            # Do standardisation (using already fir model from source language)
-            # Do PCA (using already fir model from source language)
+            # Do standardisation (using already fit model from source language)
+            # Do PCA (using already fit model from source language)
             # Test SVM
 
             # Log results
