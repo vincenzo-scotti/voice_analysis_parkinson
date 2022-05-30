@@ -12,6 +12,30 @@ from argparse import ArgumentParser, Namespace
 
 
 def main(args: Namespace):
+
+    # Prepare environment (set random seed etc.)
+
+    # Load source language audio paths and labels
+    # Generate train-test split
+    # Load target language audio paths and labels
+    # Get maximum length for padding
+
+    # For each feature
+        # For each padding approach
+            # Get source langauge features
+            # Do standardisation
+            # Do PCA
+            # Train and Test SVM
+
+            # Log results
+
+            # Get target language features
+            # Do standardisation (using already fir model from source language)
+            # Do PCA (using already fir model from source language)
+            # Test SVM
+
+            # Log results
+
     return 0
 
 
