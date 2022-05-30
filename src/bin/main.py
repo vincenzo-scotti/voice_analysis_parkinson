@@ -21,7 +21,7 @@ def main(args: Namespace):
     # Get maximum length for padding
 
     # For each feature
-        # For each padding approach
+        # For each pooling approach
             # Get source langauge features
             # Do standardisation
             # Do PCA
