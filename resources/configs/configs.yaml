@@ -1,0 +1,15 @@
+random_seed: 42
+
+features:
+  spectral:
+    args:
+    kwargs:
+  vggish:
+    args:
+    kwargs:
+  soundnet:
+    args:
+    kwargs:
+  wav2vec:
+    args:
+    kwargs:

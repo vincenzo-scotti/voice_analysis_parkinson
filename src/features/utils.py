@@ -23,9 +23,7 @@ def load_audio(file_path: str, tgt_len: Optional[float] = None) -> Tuple[np.ndar
     return raw_audio_data, sample_rate
 
 
-def pooling(data: np.ndarray, t_pooling: str) -> np.ndarray:
-    t_pooling = GlobalPooling(t_pooling)
-
+def pooling(data: np.ndarray, t_pooling: GlobalPooling) -> np.ndarray:
     if t_pooling == GlobalPooling.AVERAGE:
         return data.mean(axis=0)
     elif t_pooling == GlobalPooling.MAXIMUM:

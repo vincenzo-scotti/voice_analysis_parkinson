@@ -15,18 +15,15 @@ This repository is organised into four main directories:
 
 - `experiments/` contains the directories to host:  
     - results of the experiments 
-    - checkpoints generated during the experiments;
     - experiment configuration dumps;
-    - experiment logs.
 - `resources/` contains:
     - directories to host the dialogue corpora used in the experiments, and the references to download them;
     - directory to host the YAML configuration files to run the experiments.
-    - directory to host the pre-trained models, and the references to download them.
+    - directory to host the pre-trained feature models, and the references to download them.
 - `src/` contains modules and scripts to: 
-    - run training steps;
-    - run evaluation steps;
-    - interact with the trained models;
-    - preprocess corpora.
+    - fit and evaluate models;
+    - extract audio features;
+    - preprocess data.
 
 For further details, refer to the `README.md` within each directory.
 
@@ -36,9 +33,9 @@ To install all the required packages, instead, run the following commands:
 
 ```bash
 # Create anaconda environment (skip cudatoolkit option if you don't want to use the GPU)
-conda create -n parkison python=3.10 cudatoolkit=11.3
+conda create -n prkns python=3.10 cudatoolkit=11.3
 # Activate anaconda environment
-conda activate parkison
+conda activate prkns
 # Install packages
 ```
 
