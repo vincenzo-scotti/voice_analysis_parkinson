@@ -131,6 +131,7 @@ dmypy.json
 # Data directories and files
 resources/data/*
 !resources/data/README.md
+rnnoise-master/*
 
 # Models directories
 resources/models/*
