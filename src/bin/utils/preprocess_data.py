@@ -18,7 +18,7 @@ from tempfile import NamedTemporaryFile
 import pandas as pd
 from argparse import ArgumentParser, Namespace
 
-OUT_DF_COLUMNS = ['file_name', 'label']
+#OUT_DF_COLUMNS = ['file_name', 'label']
 
 
 def main(args: Namespace):
@@ -59,7 +59,7 @@ def main(args: Namespace):
         # Save metadata
         metadata.append((output_file_name, row.label))
     # Save metadata
-    metadata_df = pd.read_csv(metadata, columns=OUT_DF_COLUMNS)
+    metadata_df = pd.DataFrame(metadata)
     metadata_df.to_csv(os.path.join(args.dest_dir_path, 'metadata.csv'), index=False)
 
     return 0
