@@ -42,6 +42,7 @@ def main(args: Namespace):
                 '-y',
                 '-i', os.path.join(args.source_dir_path, row.file_path),
                 '-ar', '48000',
+                '-ac', '1',
                 input_wav.name
             ])
             # Apply denoising
