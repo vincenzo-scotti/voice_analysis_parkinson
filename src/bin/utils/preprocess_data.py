@@ -32,7 +32,7 @@ def main(args: Namespace):
     # Iterate over file paths
     for _, row in metadata_df.iterrows():
         # Prepare output file path
-        output_file_name = re.sub(os.path.sep, '_', row.file_path)
+        output_file_name = os.path.splitext(row.file_path)[0].replace(os.path.sep, '_')+".wav"
         output_file_path = os.path.join(args.dest_dir_path, output_file_name)
         # Temporary files for intermediate output of denoising
         with NamedTemporaryFile(suffix='.wav') as input_wav, NamedTemporaryFile(suffix='.pcm') as output_pcm:
