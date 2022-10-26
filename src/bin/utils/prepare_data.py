@@ -49,7 +49,7 @@ def main(args: Namespace):
             # Save metadata
             metadata.append((output_file_name, row.label, row.file_name, row.start_time, row.end_time))
     # Save metadata
-    metadata_df = pd.read_csv(metadata, columns=OUT_DF_COLUMNS)
+    metadata_df = pd.DataFrame(metadata)
     metadata_df.to_csv(os.path.join(args.dest_dir_path, 'metadata.csv'), index=False)
 
     return 0
