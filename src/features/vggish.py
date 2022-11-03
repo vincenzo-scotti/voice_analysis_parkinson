@@ -1,15 +1,15 @@
 from typing import Optional
 import numpy as np
-from .utils import load_audio, pooling, GlobalPooling
+from .utils import pooling, GlobalPooling
+import torch
 
 vggish: Optional = None
 
 
-def get_vggish(*args, **kwargs):
+def get_vggish():
     global vggish
     if vggish is None:
-        ...
-
+        vggish = torch.hub.load('harritaylor/torchvggish', 'vggish')
     return vggish
 
 
@@ -20,10 +20,10 @@ def get_vggish_features(
         tgt_len: Optional[float] = None,
         **model_kwargs
 ) -> np.ndarray:
-    raw_data, sample_rate = load_audio(file_path, tgt_len=tgt_len)
-    model = get_vggish(*model_args, **model_kwargs)
-
-    audio_features = ...
+    model = get_vggish()
+    
+    #processing data
+    audio_features = model.forward(file_path)
 
     if pooling is not None:
         return pooling(audio_features, t_pooling)
