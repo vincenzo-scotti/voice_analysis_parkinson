@@ -33,7 +33,7 @@ def get_vggish_features(
         return audio_features
 
 '''
-FOR DEBUG PURPOSE
+#FOR DEBUG PURPOSE
 if __name__ == "__main__":
     os.environ["CUDA_VISIBLE_DEVICES"] = ""
     a = get_vggish()
