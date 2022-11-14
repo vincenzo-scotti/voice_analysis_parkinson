@@ -30,8 +30,8 @@ def get_wav2vec_features(
     raw_data, sample_rate = load_audio(file_path, tgt_len=tgt_len)
     model, processor = get_wav2vec()
 
-    # processing data
-    inputs = processor(raw_data, sampling_rate=sample_rate, return_tensors="pt")
+    # processing data, model pretrained needs sr of 16kHz
+    inputs = processor(raw_data, sampling_rate=16000, return_tensors="pt")
     with torch.no_grad():
         outputs = model(**inputs)
     audio_features = torch.squeeze(outputs.last_hidden_state).numpy()
@@ -43,14 +43,14 @@ def get_wav2vec_features(
         return audio_features
 
 
-'''
-FOR DEBUG PURPOSE
-if __name__ == "__main__":
-    mod,proc = get_wav2vec()
-    raw_data, sample_rate = load_audio("resources/data/Split_denoised_hindi/AUD-20210515-WA0002_000.wav", tgt_len=None)
-    inputs = proc(raw_data, sampling_rate=16000, return_tensors="pt")
-    with torch.no_grad():
-        outputs = mod(**inputs)
-    audio_features = torch.squeeze(outputs.last_hidden_state).numpy()
-    print(audio_features,audio_features.shape)
-'''
+
+# #FOR DEBUG PURPOSE
+# if __name__ == "__main__":
+#     mod,proc = get_wav2vec()
+#     raw_data, sample_rate = load_audio("resources/data/Split_denoised_hindi/AUD-20210515-WA0002_000.wav", tgt_len=None)
+#     inputs = proc(raw_data, sampling_rate=sample_rate, return_tensors="pt")
+#     with torch.no_grad():
+#         outputs = mod(**inputs)
+#     audio_features = torch.squeeze(outputs.last_hidden_state).numpy()
+#     print(audio_features,audio_features.shape)
+

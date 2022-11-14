@@ -73,10 +73,10 @@ class SoundNet8_pytorch(nn.Module):
         for net in [self.conv1, self.conv2, self.conv3, self.conv4, self.conv5, self.conv6, self.conv7]:
             x = net(x)
             output_list.append(x.detach().cpu().numpy())
-        object_pred = self.conv8(x)
-        output_list.append(object_pred.detach().cpu().numpy())
-        scene_pred = self.conv8_2(x)
-        output_list.append(scene_pred.detach().cpu().numpy())
+        # object_pred = self.conv8(x)
+        # output_list.append(object_pred.detach().cpu().numpy())
+        # scene_pred = self.conv8_2(x)
+        # output_list.append(scene_pred.detach().cpu().numpy())
         return output_list
 
 
@@ -101,23 +101,32 @@ def get_soundnet_features(
 ) -> np.ndarray:
     raw_data, sample_rate = torchaudio.load(file_path)
     model = get_soundnet()
+    resampler = torchaudio.transforms.Resample(48000, 22050)
+    raw_data = resampler.forward(raw_data)
     raw_data = raw_data.unsqueeze(1).unsqueeze(-1)
 
     #Processing data
     feats = model.extract_feat(raw_data)
     audio_features = feats[6].squeeze(0).squeeze(-1).T
-
+    #output shape (7,1024)
     if pooling is not None:
         return pooling(audio_features, t_pooling)
     else:
         return audio_features
 
 
-#FOR DEBUG PURPOSE
+# #FOR DEBUG PURPOSE
 # if __name__ == "__main__":
 #     a = get_soundnet()
+#     # metadata = torchaudio.info("resources/data/Split_denoised_hindi/AUD-20210515-WA0002_000.wav")
+#     # print(metadata)
 #     raw_data, sample_rate = torchaudio.load("resources/data/Split_denoised_hindi/AUD-20210515-WA0002_000.wav")
+#     resampler = torchaudio.transforms.Resample(48000,22050)
+#     print(raw_data.shape)
+#     raw_data=resampler.forward(raw_data)
+#     print(raw_data.shape)
 #     raw_data = raw_data.unsqueeze(1).unsqueeze(-1)
+#     print(raw_data.shape)
 #     feats = a.extract_feat(raw_data)
 #     # features for layer1 to layer8
 #     print(feats[6].squeeze(0).squeeze(-1).T.shape)
