@@ -60,7 +60,7 @@ def get_spectral_features(file_path: str, t_pooling: Optional[GlobalPooling] = N
     duration = librosa.get_duration(data, sample_rate)
     # extraction of features
     mfcc_features = get_mfcc(data,sample_rate)
-    acustic_features = get_acustic_features(file_path, F0MIN, 500, duration)
+    acustic_features = get_acustic_features(file_path, F0MIN, F0MAX, duration)
 
     # matrix x axis length validation
     while acustic_features.shape[0] != mfcc_features.shape[0]:
@@ -79,28 +79,28 @@ def get_spectral_features(file_path: str, t_pooling: Optional[GlobalPooling] = N
         return final_features
 
 
-#FOR DEBUG PURPOSE
-if __name__ == "__main__":
-    #print(get_spectral_features(file_path="resources/data/Split_denoised_hindi/AUD-20210515-WA0002_000.wav").shape)
-
-
-    data1, sample_rate = librosa.load("resources/data/Split_denoised_hindi/AUD-20210525-WA0024_000.wav", sr=16000)
-    #GET THE MAX DURATION AS UPPER BOUND
-
-    mfcc = librosa.feature.mfcc(y=data1, sr=16000, n_mfcc = 13,n_fft=WINDOW_LENGHT, hop_length=HOP_LENGHT)
-    mfcc = mfcc.T
-    print(sample_rate,mfcc,mfcc.shape,type(mfcc))
-
-    sound = parselmouth.Sound("resources/data/Split_denoised_hindi/AUD-20210525-WA0024_000.wav")
-    duration = librosa.get_duration(data1,sample_rate)
-    acusticFeatures = get_acustic_features(sound, 75, 500,duration)
-    while acusticFeatures.shape[0] != mfcc.shape[0]:
-        if acusticFeatures.shape[0] < mfcc.shape[0]:
-            mfcc = mfcc[:-1]
-        else:
-            acusticFeatures = acusticFeatures[:-1]
-    finalFeatures = np.append(mfcc, acusticFeatures, axis=1)
-    print(finalFeatures,finalFeatures.shape)
+# #FOR DEBUG PURPOSE
+# if __name__ == "__main__":
+#     #print(get_spectral_features(file_path="resources/data/Split_denoised_hindi/AUD-20210515-WA0002_000.wav").shape)
+#
+#
+#     data1, sample_rate = librosa.load("resources/data/Split_denoised_hindi/AUD-20210525-WA0024_000.wav", sr=16000)
+#     #GET THE MAX DURATION AS UPPER BOUND
+#
+#     mfcc = librosa.feature.mfcc(y=data1, sr=16000, n_mfcc = 13,n_fft=WINDOW_LENGHT, hop_length=HOP_LENGHT)
+#     mfcc = mfcc.T
+#     print(sample_rate,mfcc,mfcc.shape,type(mfcc))
+#
+#     sound = parselmouth.Sound("resources/data/Split_denoised_hindi/AUD-20210525-WA0024_000.wav")
+#     duration = librosa.get_duration(data1,sample_rate)
+#     acusticFeatures = get_acustic_features(sound, F0MIN, F0MAX,duration)
+#     while acusticFeatures.shape[0] != mfcc.shape[0]:
+#         if acusticFeatures.shape[0] < mfcc.shape[0]:
+#             mfcc = mfcc[:-1]
+#         else:
+#             acusticFeatures = acusticFeatures[:-1]
+#     finalFeatures = np.append(mfcc, acusticFeatures, axis=1)
+#     print(finalFeatures,finalFeatures.shape)
 
 
 
