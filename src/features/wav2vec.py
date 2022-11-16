@@ -27,7 +27,7 @@ def get_wav2vec_features(
         tgt_len: Optional[float] = None,
         **model_kwargs
 ) -> np.ndarray:
-    raw_data, sample_rate = load_audio(file_path, tgt_len=tgt_len)
+    raw_data, sample_rate = load_audio(file_path, tgt_len=tgt_len,sr=16000)
     model, processor = get_wav2vec()
 
     # processing data, model pretrained needs sr of 16kHz
@@ -47,7 +47,7 @@ def get_wav2vec_features(
 # #FOR DEBUG PURPOSE
 # if __name__ == "__main__":
 #     mod,proc = get_wav2vec()
-#     raw_data, sample_rate = load_audio("resources/data/Split_denoised_hindi/AUD-20210515-WA0002_000.wav", tgt_len=None)
+#     raw_data, sample_rate = load_audio("resources/data/Split_denoised_hindi/AUD-20210515-WA0002_000.wav", tgt_len=None, sr=16000)
 #     inputs = proc(raw_data, sampling_rate=sample_rate, return_tensors="pt")
 #     with torch.no_grad():
 #         outputs = mod(**inputs)

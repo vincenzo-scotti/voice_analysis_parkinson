@@ -14,8 +14,8 @@ def get_audio_length(file_path: str) -> float:
     ...
 
 
-def load_audio(file_path: str, tgt_len: Optional[float] = None) -> Tuple[np.ndarray, int]:
-    raw_audio_data, sample_rate = librosa.load(file_path, sr=None)
+def load_audio(file_path: str, tgt_len: Optional[float] = None, sr: Optional[int] = None) -> Tuple[np.ndarray, int]:
+    raw_audio_data, sample_rate = librosa.load(file_path, sr=sr)
     if tgt_len is not None and tgt_len > 0.0:
         padding = int((tgt_len * sample_rate) - len(raw_audio_data))
         raw_audio_data = np.pad(raw_audio_data, pad_width=(0, padding))

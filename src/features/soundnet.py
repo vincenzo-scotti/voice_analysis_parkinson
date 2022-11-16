@@ -130,6 +130,6 @@ def get_soundnet_features(
 #     feats = a.extract_feat(raw_data)
 #     # features for layer1 to layer8
 #     print(feats[6].squeeze(0).squeeze(-1).T.shape)
-#     # for idx, f in enumerate(feats):
-#     #     f= f.squeeze().T
-#     #     print(f"feature shape for layer {idx}: {f.shape}")
+# #     # for idx, f in enumerate(feats):
+# #     #     f= f.squeeze().T
+# #     #     print(f"feature shape for layer {idx}: {f.shape}")

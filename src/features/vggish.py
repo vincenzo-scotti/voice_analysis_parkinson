@@ -32,14 +32,13 @@ def get_vggish_features(
     else:
         return audio_features
 
-'''
-#FOR DEBUG PURPOSE
-if __name__ == "__main__":
-    os.environ["CUDA_VISIBLE_DEVICES"] = ""
-    a = get_vggish()
-    a.eval()
-    res = a.forward("resources/data/Split_denoised_hindi/AUD-20210515-WA0002_000.wav")
-    print(type(res.detach().cpu().numpy()))
 
-    print(res.detach().cpu().numpy().shape)
-'''
+# #FOR DEBUG PURPOSE
+# if __name__ == "__main__":
+#     os.environ["CUDA_VISIBLE_DEVICES"] = ""
+#     a = get_vggish()
+#     a.eval()
+#     res = a.forward("resources/data/Split_denoised_hindi/AUD-20210515-WA0002_000.wav")
+#     print(type(res.detach().cpu().numpy()))
+#
+#     print(res.detach().cpu().numpy().shape)
