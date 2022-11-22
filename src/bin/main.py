@@ -12,6 +12,8 @@ import sys
 from shutil import copy2
 from datetime import datetime
 from argparse import ArgumentParser, Namespace
+
+import librosa
 import yaml
 
 from typing import List, Dict
@@ -25,7 +27,7 @@ from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.svm import SVC
 
-from features import GlobalPooling, pooling, get_audio_length, FEATURE_EXTRACTORS
+from features import GlobalPooling, pooling, FEATURE_EXTRACTORS, trunc_audio
 
 
 def main(args: Namespace):
@@ -63,10 +65,8 @@ def main(args: Namespace):
         os.path.join(args.target_language_data_dir_path, file_name) for file_name in tgt_language_metadata_df.file_name
     ]
     y_tgt_labels: np.ndarray = le.transform([label for label in tgt_language_metadata_df.label])
-
-    # Get maximum length for padding
-    max_audio_len = max(get_audio_length(path) for path in X_src_paths + X_tgt_paths)
-
+    X_src_len: List[float] = [librosa.get_duration(filename=path) for path in X_src_paths]
+    X_tgt_len: List[float] = [librosa.get_duration(filename=path) for path in X_tgt_paths]
     # For each feature
     for feature in FEATURE_EXTRACTORS:
         # Extract feature sequences
@@ -74,7 +74,6 @@ def main(args: Namespace):
             FEATURE_EXTRACTORS[feature](
                 path,
                 *configs['features'][feature].get('args', tuple()),
-                tgt_len=max_audio_len,
                 **configs['features'][feature].get('kwargs', dict())
             )
             for path in X_src_paths
@@ -83,11 +82,18 @@ def main(args: Namespace):
             FEATURE_EXTRACTORS[feature](
                 path,
                 *configs['features'][feature].get('args', tuple()),
-                tgt_len=max_audio_len,
                 **configs['features'][feature].get('kwargs', dict())
             )
             for path in X_tgt_paths
         ]
+        # Input, liste di durate, matrici feaure x-src e x-tgt
+        X_src, y_src_labels = list(
+            zip(*sum([trunc_audio(X, y, d) for X, y, d in zip(X_src, y_src_labels, X_src_len)], [])))
+        X_tgt, y_tgt_labels = list(
+            zip(*sum([trunc_audio(X, y, d) for X, y, d in zip(X_tgt, y_tgt_labels, X_tgt_len)], [])))
+        # TODO call utils function to split audio further, (also keep track of label)
+        # splith both y_source (english) and y_target (hindi)
+
         # For each pooling approach
         for t_pooling in GlobalPooling:
             # Get source langauge features
