@@ -65,8 +65,11 @@ def main(args: Namespace):
         os.path.join(args.target_language_data_dir_path, file_name) for file_name in tgt_language_metadata_df.file_name
     ]
     y_tgt_labels: np.ndarray = le.transform([label for label in tgt_language_metadata_df.label])
-    X_src_len: List[float] = [librosa.get_duration(filename=path) for path in X_src_paths]
-    X_tgt_len: List[float] = [librosa.get_duration(filename=path) for path in X_tgt_paths]
+
+    # Compute audio file durations in seconds
+    X_src_duration: List[float] = [librosa.get_duration(filename=path) for path in X_src_paths]
+    X_tgt_duration: List[float] = [librosa.get_duration(filename=path) for path in X_tgt_paths]
+
     # For each feature
     for feature in FEATURE_EXTRACTORS:
         # Extract feature sequences
@@ -86,34 +89,42 @@ def main(args: Namespace):
             )
             for path in X_tgt_paths
         ]
-        # Input, liste di durate, matrici feaure x-src e x-tgt
-        X_src, y_src_labels = list(
-            zip(*sum([trunc_audio(X, y, d) for X, y, d in zip(X_src, y_src_labels, X_src_len)], [])))
-        X_tgt, y_tgt_labels = list(
-            zip(*sum([trunc_audio(X, y, d) for X, y, d in zip(X_tgt, y_tgt_labels, X_tgt_len)], [])))
+
+        # Apply train-test splitting to source data (including durations)
+        X_src_train: List[np.ndarray] = [X_src[i] for i in X_src_train_idxs]
+        X_src_train_duration: List[float] = [X_src[i] for i in X_src_train_idxs]
+        X_src_test: List[np.ndarray] = [X_src[i] for i in X_src_test_idxs]
+        X_src_test_duration: List[float] = [X_src[i] for i in X_src_test_idxs]
+
+        # Apply chunking to all feature maps and and train-test splitting to source data
+        X_src_train, y_src_train = list(zip(*sum([
+            trunc_audio(X, y, d, chunk_len=configs.get('chunk_duration', 4.0))
+            for X, y, d in zip(X_src_train, y_src_train, X_src_train_duration)
+        ], [])))
+        X_src_test, y_src_test = list(zip(*sum([
+            trunc_audio(X, y, d, chunk_len=configs.get('chunk_duration', 4.0))
+            for X, y, d in zip(X_src_test, y_src_test, X_src_test_duration)
+        ], [])))
+        X_tgt, y_tgt_labels = list(zip(*sum([
+            trunc_audio(X, y, d, chunk_len=configs.get('chunk_duration', 4.0))
+            for X, y, d in zip(X_tgt, y_tgt_labels, X_tgt_duration)
+        ], [])))
         # TODO call utils function to split audio further, (also keep track of label)
         # splith both y_source (english) and y_target (hindi)
 
         # For each pooling approach
         for t_pooling in GlobalPooling:
-            # Get source langauge features
-            X_src: np.ndarray = np.vstack([pooling(x, t_pooling)] for x in X_src)
+            # Get source language features
+            X_src_train: np.ndarray = np.vstack([pooling(x, t_pooling)] for x in X_src_train)
+            X_src_test: np.ndarray = np.vstack([pooling(x, t_pooling)] for x in X_src_test)
             # Do standardisation
-            std_scaler: StandardScaler = StandardScaler()
-            X_src: np.ndarray = std_scaler.fit_transform(X_src)
+            std_scaler: StandardScaler = StandardScaler().fit(X_src_train)
+            X_src_train: np.ndarray = std_scaler.transform(X_src_train)
+            X_src_test: np.ndarray = std_scaler.transform(X_src_test)
             # Do PCA
-            pca: PCA = PCA(n_components=configs.get('pca_components', 0.9))
-            X_src_train: np.ndarray = pca.fit_transform(X_src[X_src_train_idxs])
-            X_src_test: np.ndarray = pca.transform(X_src[X_src_test_idxs])
-            # Train SVM
-            svm: SVC = SVC()
-            svm.fit(X_src_train, y_src_train)
-            # Test SVM
-            y_src_test_pred = svm.predict(X_src_test)
-            y_src_test_proba = svm.predict_proba(X_src_test)
-            src_cls_report = classification_report(y_src_test, y_src_test_pred)
-            src_auc_score = roc_auc_score(y_src_test, y_src_test_proba)
-            src_confusion_matrix = confusion_matrix(y_src_test, y_src_test_pred, normalize='true')
+            pca: PCA = PCA(n_components=configs.get('pca_components', 0.9)).fit(X_src_train)
+            X_src_train: np.ndarray = pca.transform(X_src_train)
+            X_src_test: np.ndarray = pca.transform(X_src_test)
 
             # Get target language features
             X_tgt: np.ndarray = np.vstack([pooling(x, t_pooling)] for x in X_tgt)
@@ -121,10 +132,28 @@ def main(args: Namespace):
             X_tgt: np.ndarray = std_scaler.transform(X_tgt)
             # Do PCA (using already fit model from source language)
             X_tgt: np.ndarray = pca.transform(X_tgt)
-            # Test SVM
-            y_tgt_pred = svm.predict(X_tgt)
+
+            # TODO add domain adaptation
+
+            # Train classifier (on source data)
+            cls: SVC = SVC()
+            cls.fit(X_src_train, y_src_train)
+            # Test classifier (on source data)
+            y_src_test_pred = cls.predict(X_src_test)
+            y_src_test_proba = cls.predict_proba(X_src_test)
+            src_cls_report = classification_report(y_src_test, y_src_test_pred)
+            src_auc_score = roc_auc_score(y_src_test, y_src_test_proba)
+            src_confusion_matrix = confusion_matrix(y_src_test, y_src_test_pred)
+
+            # Test classifier (on target data)
+            y_tgt_pred = cls.predict(X_tgt)
+            y_tgt_proba = cls.predict(X_tgt)
             tgt_cls_report = classification_report(y_tgt_labels, y_tgt_pred)
-            tgt_confusion_matrix = confusion_matrix(y_tgt_labels, y_tgt_pred, normalize='pred')
+            tgt_auc_score = roc_auc_score(y_tgt_labels, y_tgt_proba)
+            tgt_confusion_matrix = confusion_matrix(y_tgt_labels, y_tgt_pred)
+            
+            # TODO do calibration? 
+            # Create a notebook for visualisation of results?
 
             # Log results
             with open(output_file_path, 'a') as f:
@@ -136,6 +165,7 @@ def main(args: Namespace):
                 print("\n\n")
                 print("Target language classification results\n", file=f)
                 print(f"Classification report: \n{tgt_cls_report}\n", file=f)
+                print(f"ROC AUC score: {tgt_auc_score}\n", file=f)
                 print(f"Confusion matrix (true label on row, predicted on columns): \n{tgt_confusion_matrix}\n", file=f)
                 print("\n\n\n\n")
 
