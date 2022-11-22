@@ -37,6 +37,9 @@ conda create -n prkns python=3.10 cudatoolkit=11.3
 # Activate anaconda environment
 conda activate prkns
 # Install packages
+
+# Install RNNoise submodule
+git submodule init; git submodule update
 ```
 
 ## References
