@@ -1,6 +1,8 @@
 from typing import Optional
+
+#import librosa
 import numpy as np
-from src.features.utils import pooling, GlobalPooling
+from src.features.utils import pooling, GlobalPooling, trunc_audio
 import torch
 import os
 
@@ -39,6 +41,11 @@ def get_vggish_features(
 #     a = get_vggish()
 #     a.eval()
 #     res = a.forward("resources/data/Split_denoised_hindi/AUD-20210515-WA0002_000.wav")
-#     print(type(res.detach().cpu().numpy()))
+#     #print(type(res.detach().cpu().numpy()))
 #
-#     print(res.detach().cpu().numpy().shape)
+#     #print(res.detach().cpu().numpy())
+#     #TEST TRUNC_AUDIO
+#     y=  np.asarray([1])
+#     duration = librosa.get_duration(filename="resources/data/Split_denoised_hindi/AUD-20210515-WA0002_000.wav")
+#     prova = trunc_audio(res.detach().cpu().numpy(),y,duration,4.0)
+#     print(type(prova),len(prova),prova[2])

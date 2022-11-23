@@ -2,16 +2,13 @@ from typing import Optional, Tuple, List
 import numpy as np
 import librosa
 from enum import Enum
+import math
 
 
 class GlobalPooling(Enum):
     AVERAGE: str = 'avg'
     MAXIMUM: str = 'max'
     FLATTENING: str = 'flatten'
-
-
-def get_audio_length(file_path: str) -> float:
-    ...
 
 
 def load_audio(file_path: str, tgt_len: Optional[float] = None, sr: Optional[int] = None) -> Tuple[np.ndarray, int]:
@@ -24,18 +21,30 @@ def load_audio(file_path: str, tgt_len: Optional[float] = None, sr: Optional[int
 
 
 # TODO add function chucking to split the audio
-# 3 input lists: 1 feature audio matrix; 2 list with same lngt of 1st with labels
-#  3 (same length) #of chunks in output
-# padding to have same length
-def trunc_audio(x, y, d, chunk_len=4.0) -> List[Tuple[np.ndarray, np.ndarray]]:
-    # calcolo# finestre  = int(math.ceil(d / chunk_len)
-    # 9,6 sec : #campioni = 4 sec : #campioni(nuovi)
+def trunc_audio(x, y, d, chunk_len=4.0) -> List[Tuple[np.ndarray,np.ndarray]]:
+    list_chunks =[]
+    windows_number = int(math.ceil(d / chunk_len))
+    #durata totale : #campioni_totali = durata chunk  : #campioni_chunk
+    sample_number = x.shape[0]
+    chunk_sample_number = int((chunk_len * sample_number) // d)
     # 'median' o 'edge' (entrambe le direzioni)
-    #shape[0] lunghezza in campioni del file audio
-    # dur (sec) : fin (sec) = dur (campioni) : fin (campioni)
-    # ripeter label tante volte quante sono le finestre
-    list_chunks = ...
-    return list_chunks
+
+    #split matrix of features, chunk starts from 0
+    for chunk in range(0,windows_number):
+        start_x = chunk * chunk_sample_number
+        if chunk == windows_number-1:
+            #padding part
+            last_chunk = x[start_x:, :]
+            diff =chunk_sample_number-(sample_number % chunk_sample_number)
+            #TODO check if .T is needed
+            last_chunk = np.pad(last_chunk, ((diff//2, math.ceil(diff/2)),(0,0)),'edge')
+            list_chunks.append(last_chunk)
+        else:
+            list_chunks.append(x[start_x:start_x+chunk_sample_number,:])
+
+    final_list_chunks = [(elem, y) for elem in list_chunks]
+    return final_list_chunks
+
 
 
 def pooling(data: np.ndarray, t_pooling: GlobalPooling) -> np.ndarray:
