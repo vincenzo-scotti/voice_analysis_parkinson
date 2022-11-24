@@ -3,7 +3,7 @@
 Codebase for the paper "[Cross-Lingual Transferability of Voice Analysis Models: a Parkinson's Disease Case Study]()". 
 For all the references, contributions and credits, please refer to the paper.
 
-This code was initially developed as part of the M.Sc. Thesis in Computer Science and Engineering "[Cross-Lingual Transferability of Voice Analysis Models: a Parkinson's Disease Case Study]()".
+This code was initially developed as part of the M.Sc. Thesis in Computer Science and Engineering "[Cross-Lingual Transferability of Voice Analysis Models: a Parkinson's Disease Case Study](https://www.overleaf.com/read/tkbjcxxjrzjb)".
 The M.Sc. degree was released by the Dipartimento di Elettronica, Informazione e Bioingengeria  ([DEIB](https://www.deib.polimi.it/eng/home-page)) of the Politecnico di Milano University ([PoliMI](https://www.unitn.it)).
 The Thesis was supervised at PoliMI by the staff of the [ARCSlab](https://arcslab.dei.polimi.it).
 
