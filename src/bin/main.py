@@ -29,6 +29,8 @@ from sklearn.svm import SVC
 
 from features import GlobalPooling, pooling, FEATURE_EXTRACTORS, trunc_audio
 
+from adapt.feature_based import CORAL
+
 
 def main(args: Namespace):
     # Prepare environment (load configs)
@@ -44,11 +46,13 @@ def main(args: Namespace):
     copy2(args.configs_file_path, os.path.join(current_experiment_dir_path, 'configs.yaml'))
     # Output file path
     output_file_path = os.path.join(current_experiment_dir_path, 'results.txt')
+    f = open(output_file_path, "x")
+    f.close()
     # Label encoder
     le = LabelEncoder()
 
     # Load source language audio paths and labels
-    src_language_metadata_df = pd.read_csv(os.path.join(args.source_language_data_dir_path, 'metadata.csv'))
+    src_language_metadata_df = pd.read_csv(os.path.join(args.source_language_data_dir_path, 'metadata.csv')).sample(100, random_state=1)
     X_src_paths: List[str] = [
         os.path.join(args.source_language_data_dir_path, file_name) for file_name in src_language_metadata_df.file_name
     ]
@@ -60,7 +64,8 @@ def main(args: Namespace):
     )
 
     # Load target language audio paths and labels
-    tgt_language_metadata_df = pd.read_csv(os.path.join(args.target_language_data_dir_path, 'metadata.csv'))
+    #TODO remove sample
+    tgt_language_metadata_df = pd.read_csv(os.path.join(args.target_language_data_dir_path, 'metadata.csv')).sample(100, random_state=1)
     X_tgt_paths: List[str] = [
         os.path.join(args.target_language_data_dir_path, file_name) for file_name in tgt_language_metadata_df.file_name
     ]
@@ -75,26 +80,22 @@ def main(args: Namespace):
         # Extract feature sequences
         X_src: List[np.ndarray] = [
             FEATURE_EXTRACTORS[feature](
-                path,
-                *configs['features'][feature].get('args', tuple()),
-                **configs['features'][feature].get('kwargs', dict())
+                path
             )
             for path in X_src_paths
         ]
         X_tgt: List[np.ndarray] = [
             FEATURE_EXTRACTORS[feature](
-                path,
-                *configs['features'][feature].get('args', tuple()),
-                **configs['features'][feature].get('kwargs', dict())
+                path
             )
             for path in X_tgt_paths
         ]
 
         # Apply train-test splitting to source data (including durations)
         X_src_train: List[np.ndarray] = [X_src[i] for i in X_src_train_idxs]
-        X_src_train_duration: List[float] = [X_src[i] for i in X_src_train_idxs]
+        X_src_train_duration: List[float] = [X_src_duration[i] for i in X_src_train_idxs]
         X_src_test: List[np.ndarray] = [X_src[i] for i in X_src_test_idxs]
-        X_src_test_duration: List[float] = [X_src[i] for i in X_src_test_idxs]
+        X_src_test_duration: List[float] = [X_src_duration[i] for i in X_src_test_idxs]
 
         # Apply chunking to all feature maps and and train-test splitting to source data
         X_src_train, y_src_train = list(zip(*sum([
@@ -109,8 +110,6 @@ def main(args: Namespace):
             trunc_audio(X, y, d, chunk_len=configs.get('chunk_duration', 4.0))
             for X, y, d in zip(X_tgt, y_tgt_labels, X_tgt_duration)
         ], [])))
-        # TODO call utils function to split audio further, (also keep track of label)
-        # splith both y_source (english) and y_target (hindi)
 
         # For each pooling approach
         for t_pooling in GlobalPooling:
@@ -134,45 +133,56 @@ def main(args: Namespace):
             X_tgt: np.ndarray = pca.transform(X_tgt)
 
             # TODO add domain adaptation
+            # ciclo for su una lista di true e false
+            #
+            for do_adaptation in [False, True]:
+                # Train classifier (on source data)
+                cls: SVC = SVC(probability=True)
+                if do_adaptation:
+                    cls = CORAL(cls, Xt=X_tgt, random_state=configs.get('random_seed', None))
+                cls.fit(X_src_train, y_src_train)
+                # Test classifier (on source data)
+                y_src_test_pred = cls.predict(X_src_test)
+                src_cls_report = classification_report(y_src_test, y_src_test_pred)
+                if not do_adaptation:
+                    y_src_test_proba = cls.predict_proba(X_src_test)
+                    src_auc_score = roc_auc_score(y_src_test, y_src_test_proba[:,1])
+                else:
+                    src_auc_score = cls.score(X_src_test,y_src_test)
+                src_confusion_matrix = confusion_matrix(y_src_test, y_src_test_pred)
 
-            # Train classifier (on source data)
-            cls: SVC = SVC()
-            cls.fit(X_src_train, y_src_train)
-            # Test classifier (on source data)
-            y_src_test_pred = cls.predict(X_src_test)
-            y_src_test_proba = cls.predict_proba(X_src_test)
-            src_cls_report = classification_report(y_src_test, y_src_test_pred)
-            src_auc_score = roc_auc_score(y_src_test, y_src_test_proba)
-            src_confusion_matrix = confusion_matrix(y_src_test, y_src_test_pred)
+                # Test classifier (on target data)
+                y_tgt_pred = cls.predict(X_tgt)
+                tgt_cls_report = classification_report(y_tgt_labels, y_tgt_pred)
+                if not do_adaptation:
+                    y_tgt_proba = cls.predict_proba(X_tgt)
+                    tgt_auc_score = roc_auc_score(y_tgt_labels, y_tgt_proba[:,1])
+                else:
+                    tgt_auc_score = cls.score(X_tgt, y_tgt_labels)
+                tgt_confusion_matrix = confusion_matrix(y_tgt_labels, y_tgt_pred)
 
-            # Test classifier (on target data)
-            y_tgt_pred = cls.predict(X_tgt)
-            y_tgt_proba = cls.predict(X_tgt)
-            tgt_cls_report = classification_report(y_tgt_labels, y_tgt_pred)
-            tgt_auc_score = roc_auc_score(y_tgt_labels, y_tgt_proba)
-            tgt_confusion_matrix = confusion_matrix(y_tgt_labels, y_tgt_pred)
-            
-            # TODO do calibration? 
-            # Create a notebook for visualisation of results?
+                # TODO do calibration?
+                # Create a notebook for visualisation of results?
 
-            # Log results
-            with open(output_file_path, 'a') as f:
-                print(f"Feature type: {feature}, pooling type: {t_pooling}\n", file=f)
-                print("Source language classification results\n", file=f)
-                print(f"Classification report: \n{src_cls_report}\n", file=f)
-                print(f"ROC AUC score: {src_auc_score}\n", file=f)
-                print(f"Confusion matrix (true label on row, predicted on columns): \n{src_confusion_matrix}\n", file=f)
-                print("\n\n")
-                print("Target language classification results\n", file=f)
-                print(f"Classification report: \n{tgt_cls_report}\n", file=f)
-                print(f"ROC AUC score: {tgt_auc_score}\n", file=f)
-                print(f"Confusion matrix (true label on row, predicted on columns): \n{tgt_confusion_matrix}\n", file=f)
-                print("\n\n\n\n")
+                # Log results
+                with open(output_file_path, 'a') as f:
+                    print(f"Feature type: {feature}, pooling type: {t_pooling}, domain adaptation: {do_adaptation}\n", file=f)
+                    print("Source language classification results\n", file=f)
+                    print(f"Classification report: \n{src_cls_report}\n", file=f)
+                    print(f"ROC AUC score: {src_auc_score}\n", file=f)
+                    print(f"Confusion matrix (true label on row, predicted on columns): \n{src_confusion_matrix}\n", file=f)
+                    print("\n\n")
+                    print("Target language classification results\n", file=f)
+                    print(f"Classification report: \n{tgt_cls_report}\n", file=f)
+                    print(f"ROC AUC score: {tgt_auc_score}\n", file=f)
+                    print(f"Confusion matrix (true label on row, predicted on columns): \n{tgt_confusion_matrix}\n", file=f)
+                    print("\n\n\n\n")
 
     return 0
 
 
 if __name__ == "__main__":
+    os.environ["CUDA_VISIBLE_DEVICES"] = ""
     # Instantiate argument parser
     args_parser: ArgumentParser = ArgumentParser()
     # Add arguments to parser
@@ -181,11 +191,11 @@ if __name__ == "__main__":
         help="Path to the YAML file with the configuration."
     )
     args_parser.add_argument(
-        '--source_language_data_dir_path', type=str, default='./resources/data/english_corpus/',
+        '--source_language_data_dir_path', type=str, default='./resources/data/Split_denoised_english/',
         help="Path to the directory with the audio clips in the source language for the experiments."
     )
     args_parser.add_argument(
-        '--target_language_data_dir_path', type=str, default='./resources/data/hindi_corpus/',
+        '--target_language_data_dir_path', type=str, default='./resources/data/Split_denoised_hindi/',
         help="Path to the directory with the audio clips in the source language for the experiments."
     )
     args_parser.add_argument(

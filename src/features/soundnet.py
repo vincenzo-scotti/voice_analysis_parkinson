@@ -94,10 +94,7 @@ def get_soundnet():
 
 def get_soundnet_features(
         file_path: str,
-        *model_args,
         t_pooling: Optional[GlobalPooling] = None,
-        tgt_len: Optional[float] = None,
-        **model_kwargs
 ) -> np.ndarray:
     raw_data, sample_rate = torchaudio.load(file_path)
     model = get_soundnet()
@@ -109,7 +106,7 @@ def get_soundnet_features(
     feats = model.extract_feat(raw_data)
     audio_features = feats[6].squeeze(0).squeeze(-1).T
     #output shape (7,1024)
-    if pooling is not None:
+    if t_pooling is not None:
         return pooling(audio_features, t_pooling)
     else:
         return audio_features
@@ -120,7 +117,7 @@ def get_soundnet_features(
 #     a = get_soundnet()
 #     # metadata = torchaudio.info("resources/data/Split_denoised_hindi/AUD-20210515-WA0002_000.wav")
 #     # print(metadata)
-#     raw_data, sample_rate = torchaudio.load("resources/data/Split_denoised_hindi/AUD-20210515-WA0002_000.wav")
+#     raw_data, sample_rate = torchaudio.load("resources/data/Split_denoised_hindi/AUD-20210515-WA0002_000.wav", format="mp3")
 #     resampler = torchaudio.transforms.Resample(48000,22050)
 #     print(raw_data.shape)
 #     raw_data=resampler.forward(raw_data)

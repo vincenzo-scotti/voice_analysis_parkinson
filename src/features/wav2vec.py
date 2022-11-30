@@ -22,10 +22,8 @@ def get_wav2vec():
 
 def get_wav2vec_features(
         file_path: str,
-        *model_args,
         t_pooling: Optional[GlobalPooling] = None,
         tgt_len: Optional[float] = None,
-        **model_kwargs
 ) -> np.ndarray:
     raw_data, sample_rate = load_audio(file_path, tgt_len=tgt_len,sr=16000)
     model, processor = get_wav2vec()
@@ -37,7 +35,7 @@ def get_wav2vec_features(
     audio_features = torch.squeeze(outputs.last_hidden_state).numpy()
     # print(list(audio_features.shape))
 
-    if pooling is not None:
+    if t_pooling is not None:
         return pooling(audio_features, t_pooling)
     else:
         return audio_features

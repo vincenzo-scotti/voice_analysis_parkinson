@@ -73,7 +73,7 @@ def get_spectral_features(file_path: str, t_pooling: Optional[GlobalPooling] = N
     final_features = np.append(mfcc_features, acustic_features, axis=1)
     print(final_features, final_features.shape)
 
-    if pooling is not None:
+    if t_pooling is not None:
         return pooling(final_features, t_pooling)
     else:
         return final_features

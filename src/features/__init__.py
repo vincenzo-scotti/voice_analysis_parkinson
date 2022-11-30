@@ -7,7 +7,7 @@ from .utils import GlobalPooling, pooling,  trunc_audio
 from typing import Dict
 
 FEATURE_EXTRACTORS: Dict = {
-    'spectral': get_spectral_features,
+    #'spectral': get_spectral_features,
     'vggish': get_vggish_features,
     'soundnet': get_soundnet_features,
     'wav2vec': get_wav2vec_features
