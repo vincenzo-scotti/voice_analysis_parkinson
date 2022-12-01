@@ -31,6 +31,7 @@ def get_acustic_features(file_path,f0min,f0max,duration):
         t_fin = min(t_in + WINDOW_LENGHT_SEC,duration)
         unit = "Hertz"
         v1 = []
+        #TODO fare una funzione che ti crea v2 con joblib
         v1.append(call(pitch, "Get mean", t_in, t_fin, unit))  # get mean pitch (mean F0)
         harmonicity = call(sound, "To Harmonicity (cc)", 0.01, 75, 0.1, 1.0)
         v1.append(call(harmonicity, "Get mean", t_in, t_fin)) #hnr
@@ -44,6 +45,7 @@ def get_acustic_features(file_path,f0min,f0max,duration):
         v1.append(call([sound, pointProcess], "Get shimmer (apq3)", t_in, t_fin, 0.0001, 0.02, 1.3, 1.6)) #apq3Shimmer
         v1.append(call([sound, pointProcess], "Get shimmer (apq5)", t_in, t_fin, 0.0001, 0.02, 1.3, 1.6)) #apq5Shimmer
         v2.append([v1])
+
         count+=1
         print(count)
     v2 = np.vstack(v2)

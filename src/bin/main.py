@@ -52,7 +52,7 @@ def main(args: Namespace):
     le = LabelEncoder()
 
     # Load source language audio paths and labels
-    src_language_metadata_df = pd.read_csv(os.path.join(args.source_language_data_dir_path, 'metadata.csv')).sample(100, random_state=1)
+    src_language_metadata_df = pd.read_csv(os.path.join(args.source_language_data_dir_path, 'metadata.csv')).sample(5, random_state=1)
     X_src_paths: List[str] = [
         os.path.join(args.source_language_data_dir_path, file_name) for file_name in src_language_metadata_df.file_name
     ]
@@ -65,7 +65,7 @@ def main(args: Namespace):
 
     # Load target language audio paths and labels
     #TODO remove sample
-    tgt_language_metadata_df = pd.read_csv(os.path.join(args.target_language_data_dir_path, 'metadata.csv')).sample(100, random_state=1)
+    tgt_language_metadata_df = pd.read_csv(os.path.join(args.target_language_data_dir_path, 'metadata.csv')).sample(5, random_state=1)
     X_tgt_paths: List[str] = [
         os.path.join(args.target_language_data_dir_path, file_name) for file_name in tgt_language_metadata_df.file_name
     ]
@@ -98,15 +98,15 @@ def main(args: Namespace):
         X_src_test_duration: List[float] = [X_src_duration[i] for i in X_src_test_idxs]
 
         # Apply chunking to all feature maps and and train-test splitting to source data
-        X_src_train, y_src_train = list(zip(*sum([
+        X_src_train, y_src_train_split = list(zip(*sum([
             trunc_audio(X, y, d, chunk_len=configs.get('chunk_duration', 4.0))
             for X, y, d in zip(X_src_train, y_src_train, X_src_train_duration)
         ], [])))
-        X_src_test, y_src_test = list(zip(*sum([
+        X_src_test, y_src_test_split = list(zip(*sum([
             trunc_audio(X, y, d, chunk_len=configs.get('chunk_duration', 4.0))
             for X, y, d in zip(X_src_test, y_src_test, X_src_test_duration)
         ], [])))
-        X_tgt, y_tgt_labels = list(zip(*sum([
+        X_tgt, y_tgt_labels_split = list(zip(*sum([
             trunc_audio(X, y, d, chunk_len=configs.get('chunk_duration', 4.0))
             for X, y, d in zip(X_tgt, y_tgt_labels, X_tgt_duration)
         ], [])))
@@ -139,27 +139,26 @@ def main(args: Namespace):
                 # Train classifier (on source data)
                 cls: SVC = SVC(probability=True)
                 if do_adaptation:
-                    cls = CORAL(cls, Xt=X_tgt, random_state=configs.get('random_seed', None))
-                cls.fit(X_src_train, y_src_train)
-                # Test classifier (on source data)
-                y_src_test_pred = cls.predict(X_src_test)
-                src_cls_report = classification_report(y_src_test, y_src_test_pred)
-                if not do_adaptation:
-                    y_src_test_proba = cls.predict_proba(X_src_test)
-                    src_auc_score = roc_auc_score(y_src_test, y_src_test_proba[:,1])
+                    adapter = CORAL(random_state=configs.get('random_seed', None))
+                    X_src_train_adapted = adapter.fit_transform(X_src_train, X_tgt)
+                    X_src_test_adapted = adapter.transform(X_src_test)
                 else:
-                    src_auc_score = cls.score(X_src_test,y_src_test)
-                src_confusion_matrix = confusion_matrix(y_src_test, y_src_test_pred)
+                    X_src_train_adapted = X_src_train
+                    X_src_test_adapted = X_src_test
+                cls.fit(X_src_train_adapted, y_src_train_split)
+                # Test classifier (on source data)
+                y_src_test_pred = cls.predict(X_src_test_adapted)
+                src_cls_report = classification_report(y_src_test_split, y_src_test_pred)
+                y_src_test_proba = cls.predict_proba(X_src_test_adapted)
+                src_auc_score = roc_auc_score(y_src_test_split, y_src_test_proba[:,1])
+                src_confusion_matrix = confusion_matrix(y_src_test_split, y_src_test_pred)
 
                 # Test classifier (on target data)
                 y_tgt_pred = cls.predict(X_tgt)
-                tgt_cls_report = classification_report(y_tgt_labels, y_tgt_pred)
-                if not do_adaptation:
-                    y_tgt_proba = cls.predict_proba(X_tgt)
-                    tgt_auc_score = roc_auc_score(y_tgt_labels, y_tgt_proba[:,1])
-                else:
-                    tgt_auc_score = cls.score(X_tgt, y_tgt_labels)
-                tgt_confusion_matrix = confusion_matrix(y_tgt_labels, y_tgt_pred)
+                tgt_cls_report = classification_report(y_tgt_labels_split, y_tgt_pred)
+                y_tgt_proba = cls.predict_proba(X_tgt)
+                tgt_auc_score = roc_auc_score(y_tgt_labels_split, y_tgt_proba[:,1])
+                tgt_confusion_matrix = confusion_matrix(y_tgt_labels_split, y_tgt_pred)
 
                 # TODO do calibration?
                 # Create a notebook for visualisation of results?
