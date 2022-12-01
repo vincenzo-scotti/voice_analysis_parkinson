@@ -132,9 +132,7 @@ def main(args: Namespace):
             # Do PCA (using already fit model from source language)
             X_tgt: np.ndarray = pca.transform(X_tgt)
 
-            # TODO add domain adaptation
-            # ciclo for su una lista di true e false
-            #
+
             for do_adaptation in [False, True]:
                 # Train classifier (on source data)
                 cls: SVC = SVC(probability=True)
@@ -160,8 +158,6 @@ def main(args: Namespace):
                 tgt_auc_score = roc_auc_score(y_tgt_labels_split, y_tgt_proba[:,1])
                 tgt_confusion_matrix = confusion_matrix(y_tgt_labels_split, y_tgt_pred)
 
-                # TODO do calibration?
-                # Create a notebook for visualisation of results?
 
                 # Log results
                 with open(output_file_path, 'a') as f:

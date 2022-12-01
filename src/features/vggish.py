@@ -32,17 +32,17 @@ def get_vggish_features(
         return audio_features
 
 
-#FOR DEBUG PURPOSE
-if __name__ == "__main__":
-    os.environ["CUDA_VISIBLE_DEVICES"] = ""
-    a = get_vggish()
-    a.eval()
-    res = a.forward("resources/data/Split_denoised_hindi/AUD-20210515-WA0002_000.wav")
-    #print(type(res.detach().cpu().numpy()))
-
-    #print(res.detach().cpu().numpy())
-    #TEST TRUNC_AUDIO
-    y=  np.asarray([1])
-    duration = librosa.get_duration(filename="resources/data/Split_denoised_hindi/AUD-20210515-WA0002_000.wav")
-    prova = trunc_audio(res.detach().cpu().numpy(),y,duration,4.0)
-    print(type(prova),len(prova),prova)
+# #FOR DEBUG PURPOSE
+# if __name__ == "__main__":
+#     os.environ["CUDA_VISIBLE_DEVICES"] = ""
+#     a = get_vggish()
+#     a.eval()
+#     res = a.forward("resources/data/Split_denoised_hindi/AUD-20210515-WA0002_000.wav")
+#     #print(type(res.detach().cpu().numpy()))
+#
+#     #print(res.detach().cpu().numpy())
+#     #TEST TRUNC_AUDIO
+#     y=  np.asarray([1])
+#     duration = librosa.get_duration(filename="resources/data/Split_denoised_hindi/AUD-20210515-WA0002_000.wav")
+#     prova = trunc_audio(res.detach().cpu().numpy(),y,duration,4.0)
+#     print(type(prova),len(prova),prova)

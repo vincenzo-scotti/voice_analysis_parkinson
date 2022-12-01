@@ -5,6 +5,9 @@ import parselmouth
 from parselmouth.praat import call
 import numpy as np
 import math
+from joblib import Parallel
+from joblib import delayed
+from joblib import parallel_backend
 
 #GLOBAL PARAMETERS
 SAMPLE_RATE = 16000
@@ -20,6 +23,28 @@ def get_mfcc(raw_data,sample_rate):
     mfcc_features_matrix = librosa.feature.mfcc(y=raw_data, sr=sample_rate, n_mfcc = 13,n_fft=WINDOW_LENGHT, hop_length=HOP_LENGHT)
     return mfcc_features_matrix.T
 
+
+
+def get_features(t_in,duration,pitch,sound,f0min,f0max):
+    t_fin = min(t_in + WINDOW_LENGHT_SEC, duration)
+    unit = "Hertz"
+    v1 = []
+    # TODO fare una funzione che ti crea v2 con joblib
+    v1.append(call(pitch, "Get mean", t_in, t_fin, unit))  # get mean pitch (mean F0)
+    harmonicity = call(sound, "To Harmonicity (cc)", 0.01, 75, 0.1, 1.0)
+    v1.append(call(harmonicity, "Get mean", t_in, t_fin))  # hnr
+    pointProcess = call(sound, "To PointProcess (periodic, cc)", f0min, f0max)
+    v1.append(call(pointProcess, "Get jitter (local)", t_in, t_fin, 0.0001, 0.02, 1.3))  # local jitter
+    v1.append(call(pointProcess, "Get jitter (local, absolute)", t_in, t_fin, 0.0001, 0.02, 1.3))  # localAbsoluteJitter
+    v1.append(call(pointProcess, "Get jitter (rap)", t_in, t_fin, 0.0001, 0.02, 1.3))  # rapjitter
+    v1.append(call(pointProcess, "Get jitter (ppq5)", t_in, t_fin, 0.0001, 0.02, 1.3))  # ppq5jitter
+    v1.append(call([sound, pointProcess], "Get shimmer (local)", t_in, t_fin, 0.0001, 0.02, 1.3, 1.6))  # localShimmer
+    v1.append(
+        call([sound, pointProcess], "Get shimmer (local_dB)", t_in, t_fin, 0.0001, 0.02, 1.3, 1.6))  # localdbShimmer
+    v1.append(call([sound, pointProcess], "Get shimmer (apq3)", t_in, t_fin, 0.0001, 0.02, 1.3, 1.6))  # apq3Shimmer
+    v1.append(call([sound, pointProcess], "Get shimmer (apq5)", t_in, t_fin, 0.0001, 0.02, 1.3, 1.6))  # apq5Shimmer
+    return v1
+
 # output (tempo,feature) e.g. (586,11)
 def get_acustic_features(file_path,f0min,f0max,duration):
     sound = parselmouth.Sound(file_path)
@@ -27,27 +52,9 @@ def get_acustic_features(file_path,f0min,f0max,duration):
     pitch_vector = np.array([i[0] for i in pitch.selected_array])
     v2=[]
     count=0
-    for t_in in np.arange(0,duration,HOP_LENGHT_SEC):
-        t_fin = min(t_in + WINDOW_LENGHT_SEC,duration)
-        unit = "Hertz"
-        v1 = []
-        #TODO fare una funzione che ti crea v2 con joblib
-        v1.append(call(pitch, "Get mean", t_in, t_fin, unit))  # get mean pitch (mean F0)
-        harmonicity = call(sound, "To Harmonicity (cc)", 0.01, 75, 0.1, 1.0)
-        v1.append(call(harmonicity, "Get mean", t_in, t_fin)) #hnr
-        pointProcess = call(sound, "To PointProcess (periodic, cc)", f0min, f0max)
-        v1.append(call(pointProcess, "Get jitter (local)", t_in, t_fin, 0.0001, 0.02, 1.3))#local jitter
-        v1.append(call(pointProcess, "Get jitter (local, absolute)", t_in, t_fin, 0.0001, 0.02, 1.3)) #localAbsoluteJitter
-        v1.append(call(pointProcess, "Get jitter (rap)", t_in, t_fin, 0.0001, 0.02, 1.3)) #rapjitter
-        v1.append(call(pointProcess, "Get jitter (ppq5)", t_in, t_fin, 0.0001, 0.02, 1.3)) #ppq5jitter
-        v1.append(call([sound, pointProcess], "Get shimmer (local)", t_in, t_fin, 0.0001, 0.02, 1.3, 1.6)) #localShimmer
-        v1.append(call([sound, pointProcess], "Get shimmer (local_dB)", t_in, t_fin, 0.0001, 0.02, 1.3, 1.6)) #localdbShimmer
-        v1.append(call([sound, pointProcess], "Get shimmer (apq3)", t_in, t_fin, 0.0001, 0.02, 1.3, 1.6)) #apq3Shimmer
-        v1.append(call([sound, pointProcess], "Get shimmer (apq5)", t_in, t_fin, 0.0001, 0.02, 1.3, 1.6)) #apq5Shimmer
-        v2.append([v1])
-
-        count+=1
-        print(count)
+    with parallel_backend('threading', n_jobs=-1):
+        v2 = Parallel(verbose=2)(delayed(get_features)(t_in,duration,pitch,sound,f0min,f0max) for t_in in np.arange(0,duration,HOP_LENGHT_SEC))
+    print("spectral done")
     v2 = np.vstack(v2)
     lenght_pitch = pitch_vector.shape[0]
     length_v2 = v2.shape[0]
