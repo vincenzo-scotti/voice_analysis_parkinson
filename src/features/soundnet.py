@@ -87,7 +87,7 @@ def get_soundnet():
     global soundnet
     if soundnet is None:
         soundnet = SoundNet8_pytorch()
-        soundnet.load_state_dict(torch.load("./sound8.pth"))
+        soundnet.load_state_dict(torch.load("./resources/models/soundnet/sound8.pth"))
 
     return soundnet
 

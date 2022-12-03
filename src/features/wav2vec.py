@@ -15,7 +15,7 @@ def get_wav2vec():
         wav2vec = Wav2Vec2Model.from_pretrained("facebook/wav2vec2-large-xlsr-53")
     if processorWav2vec is None:
         feature_extractor = AutoFeatureExtractor.from_pretrained("facebook/wav2vec2-large-xlsr-53")
-        tokenizer = Wav2Vec2CTCTokenizer("./vocab.json", unk_token="[UNK]", pad_token="[PAD]", word_delimiter_token="|")
+        tokenizer = Wav2Vec2CTCTokenizer("./resources/models/wav2vec/vocab.json", unk_token="[UNK]", pad_token="[PAD]", word_delimiter_token="|")
         processorWav2vec = Wav2Vec2Processor(feature_extractor=feature_extractor, tokenizer=tokenizer)
     return wav2vec, processorWav2vec
 
