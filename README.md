@@ -36,12 +36,30 @@ conda create -n prkns python=3.10
 # Activate anaconda environment
 conda activate prkns
 # Install packages
+conda install -c anaconda numpy pandas
+conda install -c conda-forge scipy matplotlib scikit-learn librosa jupyterlab transformers
+conda install -c pytorch torchaudio
+conda install -c bioconda adapt
+pip install praat-parselmouth
+```
 
+Alternatively create an environment from the YAML configuration file
+
+```bash
+# Create and initialise the environment
+conda env create -f environment.yaml
+ Activate anaconda environment
+conda activate prkns
+```
+
+Finally download and initialise the RNNoise submodule
+
+```bash
 # Install RNNoise submodule 
 git submodule init; git submodule update
 ```
 
-Once the RNNoise submodule is initialised, follow the instructions in `nnoise/README.md` to install it.
+Once the RNNoise submodule is initialised, follow the instructions in `rnnoise/README.md` to install it.
 
 To add the source code directory to the Python path, you can add this line to the file `~/.bashrc`
 
