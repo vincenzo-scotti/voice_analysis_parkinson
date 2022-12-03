@@ -16,7 +16,7 @@ from argparse import ArgumentParser, Namespace
 import librosa
 import yaml
 
-from typing import List, Dict
+from typing import List, Dict, Union, Tuple
 
 import numpy as np
 import pandas as pd
@@ -26,6 +26,7 @@ from sklearn.metrics import (
     classification_report,
     accuracy_score,
     precision_recall_fscore_support,
+    recall_score,
     roc_auc_score,
     roc_curve,
     precision_recall_curve,
@@ -164,7 +165,7 @@ def main(args: Namespace):
                 src_precision_score, src_recall_score, src_fscore, src_support = precision_recall_fscore_support(
                     y_src_test_split, y_src_test_pred, average='macro'
                 )
-                src_specificity_score = recall_score(y_src_test_split, y_src_test_pred, pos_label=0)
+                src_specificity_score = recall_score(y_src_test_split, y_src_test_pred, average='macro', pos_label=0)
                 src_auc_score = roc_auc_score(y_src_test_split, y_src_test_proba)
                 src_fpr, src_tpr, src_roc_threshold = roc_curve(y_src_test_split, y_src_test_proba)
                 src_pr, src_rc, src_pr_rc_threshold = precision_recall_curve(y_src_test_split, y_src_test_proba)
@@ -179,8 +180,8 @@ def main(args: Namespace):
                 tgt_precision_score, tgt_recall_score, tgt_fscore, tgt_support = precision_recall_fscore_support(
                     y_tgt_labels_split, y_tgt_pred, average='macro'
                 )
-                tgt_specificity_score = recall_score(y_tgt_labels_split, y_tgt_pred, pos_label=0)
-                tgt_auc_score = roc_auc_score(y_tgt_labels_split, y_tgt_proba[:, 1])
+                tgt_specificity_score = recall_score(y_tgt_labels_split, y_tgt_pred, average='macro', pos_label=0)
+                tgt_auc_score = roc_auc_score(y_tgt_labels_split, y_tgt_proba)
                 tgt_fpr, tgt_tpr, tgt_roc_threshold = roc_curve(y_tgt_labels_split, y_tgt_proba)
                 tgt_pr, tgt_rc, tgt_pr_rc_threshold = precision_recall_curve(y_tgt_labels_split, y_tgt_proba)
 
