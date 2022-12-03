@@ -1,0 +1,7 @@
+# Global
+random_seed: 42
+# Experiment
+experiments_dir: ./experiments/
+# Languages
+src_lang_dir: ./resources/data/preprocessed/en/
+tgt_lang_dir: ./resources/data/preprocessed/hi/
