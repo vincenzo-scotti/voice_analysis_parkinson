@@ -42,7 +42,6 @@ Directory structure:
         |- cv-corpus-11.0-delta-2022-09-21/
           |- hi/
             |- clips/
-              |- common_voice_hi_33243553.mp3
-              |- common_voice_hi_33243554.mp3
+              |- metadata.csv (for preprocessing script)
               |- ...
 ```
