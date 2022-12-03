@@ -36,23 +36,10 @@ conda create -n prkns python=3.10
 # Activate anaconda environment
 conda activate prkns
 # Install packages
-conda install -c anaconda numpy pandas
-conda install -c conda-forge scipy matplotlib scikit-learn librosa jupyterlab transformers
-conda install -c pytorch torchaudio
-conda install -c bioconda adapt
-pip install praat-parselmouth
+pip install -r requirements.txt
 ```
 
-Alternatively create an environment from the YAML configuration file
-
-```bash
-# Create and initialise the environment
-conda env create -f environment.yaml
- Activate anaconda environment
-conda activate prkns
-```
-
-Finally download and initialise the RNNoise submodule
+Finally, download and initialise the RNNoise submodule
 
 ```bash
 # Install RNNoise submodule 
