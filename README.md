@@ -14,8 +14,11 @@ The Thesis was supervised at PoliMI by the staff of the [ARCSlab](https://arcsla
 This repository is organised into four main directories:
 
 - `experiments/` contains the directories to host:  
-    - results of the experiments 
-    - experiment configuration dumps;
+    - results of the experiments;
+    - experiment configuration dumps.
+- `notebboks/` contains the Jupyter notebooks to do:  
+    - data exploration;
+    - results analysis.
 - `resources/` contains:
     - directories to host the dialogue corpora used in the experiments, and the references to download them;
     - directory to host the YAML configuration files to run the experiments.
