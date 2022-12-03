@@ -18,7 +18,7 @@ from tempfile import NamedTemporaryFile
 import pandas as pd
 from argparse import ArgumentParser, Namespace
 
-#OUT_DF_COLUMNS = ['file_name', 'label']
+OUT_DF_COLUMNS = ['file_name', 'label']
 
 
 def main(args: Namespace):
@@ -32,7 +32,7 @@ def main(args: Namespace):
     # Iterate over file paths
     for _, row in metadata_df.iterrows():
         # Prepare output file path
-        output_file_name = os.path.splitext(row.file_path)[0].replace(os.path.sep, '_')+".wav"
+        output_file_name = os.path.splitext(row.file_path)[0].replace(os.path.sep, '_') + '.wav'
         output_file_path = os.path.join(args.dest_dir_path, output_file_name)
         # Temporary files for intermediate output of denoising
         with NamedTemporaryFile(suffix='.wav') as input_wav, NamedTemporaryFile(suffix='.pcm') as output_pcm:
@@ -60,7 +60,7 @@ def main(args: Namespace):
         # Save metadata
         metadata.append((output_file_name, row.label))
     # Save metadata
-    metadata_df = pd.DataFrame(metadata)
+    metadata_df = pd.DataFrame(metadata, columns=OUT_DF_COLUMNS)
     metadata_df.to_csv(os.path.join(args.dest_dir_path, 'metadata.csv'), index=False)
 
     return 0

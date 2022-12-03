@@ -16,6 +16,7 @@ import os
 import sys
 import subprocess
 import pandas as pd
+import math
 from argparse import ArgumentParser, Namespace
 
 OUT_DF_COLUMNS = ['file_name', 'label', 'original_file_name', 'start_time', 'end_time']
@@ -33,24 +34,40 @@ def main(args: Namespace):
     for _, grp in metadata_df.groupby('file_name'):
         for idx, (_, row) in enumerate(grp.iterrows()):
             # Prepare output file path
-            base_name, extension = os.path.splitext(row.file_name)
-            output_file_name = base_name + f'_{str(idx).zfill(3)}' + extension
+            output_file_name = (
+                    os.path.splitext(row.file_name)[0] + f'_{str(idx).zfill(3)}' + '.wav'
+            ).replace(os.path.sep, '_')
             output_file_path = os.path.join(args.dest_dir_path, output_file_name)
-            # Cut audio clip
-            subprocess.run([
-                'ffmpeg',
-                '-y',
-                '-i', os.path.join(args.source_dir_path, row.file_name),
-                '-ss', row.start_time,
-                '-to', row.end_time,
-                '-c', 'copy',
-                output_file_path
-            ])
+            if math.isnan(row.start_time) or math.isnan(row.end_time):
+                # If no timing is given simply copy/convert audio file
+                subprocess.run([
+                    'ffmpeg',
+                    '-y',
+                    '-i', os.path.join(args.source_dir_path, row.file_name),
+                    '-c', 'copy',
+                    output_file_path
+                ])
+            else:
+                # Cut audio clip
+                subprocess.run([
+                    'ffmpeg',
+                    '-y',
+                    '-i', os.path.join(args.source_dir_path, row.file_name),
+                    '-ss', row.start_time,
+                    '-to', row.end_time,
+                    '-c', 'copy',
+                    output_file_path
+                ])
             # Save metadata
             metadata.append((output_file_name, row.label, row.file_name, row.start_time, row.end_time))
     # Save metadata
-    metadata_df = pd.DataFrame(metadata)
-    metadata_df.to_csv(os.path.join(args.dest_dir_path, 'metadata.csv'), index=False)
+    metadata_df = pd.DataFrame(metadata, columns=OUT_DF_COLUMNS)
+    metadata_df.to_csv(
+        os.path.join(args.dest_dir_path, 'metadata.csv'),
+        mode='a',
+        header=os.path.exists(os.path.join(args.dest_dir_path, 'metadata.csv')),
+        index=False
+    )
 
     return 0
 
