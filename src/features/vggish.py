@@ -1,10 +1,8 @@
 from typing import Optional
-
-import librosa
 import numpy as np
 from src.features.utils import pooling, GlobalPooling, trunc_audio
 import torch
-import os
+from .utils import FeaturesCache, safe_features_load
 
 vggish: Optional = None
 
@@ -17,19 +15,31 @@ def get_vggish():
     return vggish
 
 
+@safe_features_load
 def get_vggish_features(
         file_path: str,
         t_pooling: Optional[GlobalPooling] = None,
+        cache_dir_path: Optional[str] = None
 ) -> np.ndarray:
-    model = get_vggish()
-
-    #processing data
-    tensor_audio_features = model.forward(file_path)
-    audio_features = tensor_audio_features.detach().cpu().numpy()
-    if t_pooling is not None:
-        return pooling(audio_features, t_pooling)
+    # Look in cache
+    if cache_dir_path is not None:
+        cache = FeaturesCache(cache_dir_path, 'vggish')
+        audio_features = cache.get_cached_features(file_path)
     else:
-        return audio_features
+        audio_features = None
+    # If not in cache load
+    if audio_features is None:
+        model = get_vggish()
+
+        #processing data
+        tensor_audio_features = model.forward(file_path)
+        audio_features = tensor_audio_features.detach().cpu().numpy()
+
+        # Apply pooling (if required)
+        if t_pooling is not None:
+            return pooling(audio_features, t_pooling)
+        else:
+            return audio_features
 
 
 # #FOR DEBUG PURPOSE

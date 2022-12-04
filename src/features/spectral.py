@@ -8,6 +8,8 @@ import math
 from joblib import Parallel
 from joblib import delayed
 from joblib import parallel_backend
+from .utils import FeaturesCache, safe_features_load
+
 
 #GLOBAL PARAMETERS
 SAMPLE_RATE = 16000
@@ -54,7 +56,7 @@ def get_acustic_features(file_path,f0min,f0max,duration):
     count=0
     with parallel_backend('threading', n_jobs=-1):
         v2 = Parallel(verbose=2)(delayed(get_features)(t_in,duration,pitch,sound,f0min,f0max) for t_in in np.arange(0,duration,HOP_LENGHT_SEC))
-    print("spectral done")
+    # print("spectral done")
     v2 = np.vstack(v2)
     lenght_pitch = pitch_vector.shape[0]
     length_v2 = v2.shape[0]
@@ -64,24 +66,38 @@ def get_acustic_features(file_path,f0min,f0max,duration):
     v3 = np.append(pitch_vector, v2, axis=1)
     return v3
 
-def get_spectral_features(file_path: str, t_pooling: Optional[GlobalPooling] = None, tgt_len: Optional[int] = None):
-    data, sample_rate = librosa.load(file_path, sr=SAMPLE_RATE)
-    duration = librosa.get_duration(data, sample_rate)
-    # extraction of features
-    mfcc_features = get_mfcc(data,sample_rate)
-    acustic_features = get_acustic_features(file_path, F0MIN, F0MAX, duration)
 
-    # matrix x axis length validation
-    while acustic_features.shape[0] != mfcc_features.shape[0]:
-        if acustic_features.shape[0] < mfcc_features.shape[0]:
-            mfcc_features = mfcc_features[:-1]
-        else:
-            acustic_features = acustic_features[:-1]
+@safe_features_load
+def get_spectral_features(
+        file_path: str,
+        t_pooling: Optional[GlobalPooling] = None,
+        cache_dir_path: Optional[str] = None
+):
+    # Look in cache
+    if cache_dir_path is not None:
+        cache = FeaturesCache(cache_dir_path, 'spectral')
+        audio_features = cache.get_cached_features(file_path)
+    else:
+        audio_features = None
+    # If not in cache load
+    if audio_features is None:
+        data, sample_rate = librosa.load(file_path, sr=SAMPLE_RATE)
+        duration = librosa.get_duration(data, sample_rate)
+        # extraction of features
+        mfcc_features = get_mfcc(data,sample_rate)
+        acustic_features = get_acustic_features(file_path, F0MIN, F0MAX, duration)
 
-    # matrix join of columns
-    final_features = np.append(mfcc_features, acustic_features, axis=1)
-    print(final_features, final_features.shape)
+        # matrix x axis length validation
+        while acustic_features.shape[0] != mfcc_features.shape[0]:
+            if acustic_features.shape[0] < mfcc_features.shape[0]:
+                mfcc_features = mfcc_features[:-1]
+            else:
+                acustic_features = acustic_features[:-1]
 
+        # matrix join of columns
+        final_features = np.append(mfcc_features, acustic_features, axis=1)
+        # print(final_features, final_features.shape)
+    # Apply pooling (if required)
     if t_pooling is not None:
         return pooling(final_features, t_pooling)
     else:

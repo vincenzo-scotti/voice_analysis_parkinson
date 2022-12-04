@@ -3,6 +3,7 @@ import numpy as np
 import torch
 from transformers import Wav2Vec2Processor, Wav2Vec2Model, Wav2Vec2CTCTokenizer, AutoFeatureExtractor
 from src.features.utils import load_audio, pooling, GlobalPooling
+from .utils import FeaturesCache, safe_features_load
 
 wav2vec: Optional = None
 processorWav2vec: Optional = None
@@ -20,21 +21,31 @@ def get_wav2vec():
     return wav2vec, processorWav2vec
 
 
+@safe_features_load
 def get_wav2vec_features(
         file_path: str,
         t_pooling: Optional[GlobalPooling] = None,
         tgt_len: Optional[float] = None,
+        cache_dir_path: Optional[str] = None
 ) -> np.ndarray:
-    raw_data, sample_rate = load_audio(file_path, tgt_len=tgt_len,sr=16000)
-    model, processor = get_wav2vec()
+    # Look in cache
+    if cache_dir_path is not None:
+        cache = FeaturesCache(cache_dir_path, 'soundnet')
+        audio_features = cache.get_cached_features(file_path)
+    else:
+        audio_features = None
+    # If not in cache load
+    if audio_features is None:
+        raw_data, sample_rate = load_audio(file_path, tgt_len=tgt_len,sr=16000)
+        model, processor = get_wav2vec()
 
-    # processing data, model pretrained needs sr of 16kHz
-    inputs = processor(raw_data, sampling_rate=16000, return_tensors="pt")
-    with torch.no_grad():
-        outputs = model(**inputs)
-    audio_features = torch.squeeze(outputs.last_hidden_state).numpy()
-    # print(list(audio_features.shape))
-
+        # processing data, model pretrained needs sr of 16kHz
+        inputs = processor(raw_data, sampling_rate=16000, return_tensors="pt")
+        with torch.no_grad():
+            outputs = model(**inputs)
+        audio_features = torch.squeeze(outputs.last_hidden_state).numpy()
+        # print(list(audio_features.shape))
+    # Apply pooling (if required)
     if t_pooling is not None:
         return pooling(audio_features, t_pooling)
     else:

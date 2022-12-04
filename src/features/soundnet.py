@@ -3,12 +3,14 @@ import numpy as np
 from src.features.utils import load_audio,pooling, GlobalPooling
 import torch, torchaudio
 import torch.nn as nn
+from .utils import FeaturesCache, safe_features_load
+
+
 torchaudio.set_audio_backend("soundfile")
 soundnet: Optional = None
 
+
 #Soundnet model class
-
-
 class SoundNet8_pytorch(nn.Module):
     def __init__(self):
         super(SoundNet8_pytorch, self).__init__()
@@ -80,9 +82,6 @@ class SoundNet8_pytorch(nn.Module):
         return output_list
 
 
-
-
-
 def get_soundnet():
     global soundnet
     if soundnet is None:
@@ -92,20 +91,30 @@ def get_soundnet():
     return soundnet
 
 
+@safe_features_load
 def get_soundnet_features(
         file_path: str,
         t_pooling: Optional[GlobalPooling] = None,
+        cache_dir_path: Optional[str] = None
 ) -> np.ndarray:
-    raw_data, sample_rate = torchaudio.load(file_path)
-    model = get_soundnet()
-    resampler = torchaudio.transforms.Resample(48000, 22050)
-    raw_data = resampler.forward(raw_data)
-    raw_data = raw_data.unsqueeze(1).unsqueeze(-1)
-
-    #Processing data
-    feats = model.extract_feat(raw_data)
-    audio_features = feats[6].squeeze(0).squeeze(-1).T
-    #output shape (7,1024)
+    # Look in cache
+    if cache_dir_path is not None:
+        cache = FeaturesCache(cache_dir_path, 'soundnet')
+        audio_features = cache.get_cached_features(file_path)
+    else:
+        audio_features = None
+    # If not in cache load
+    if audio_features is None:
+        raw_data, sample_rate = torchaudio.load(file_path)
+        model = get_soundnet()
+        resampler = torchaudio.transforms.Resample(48000, 22050)
+        raw_data = resampler.forward(raw_data)
+        raw_data = raw_data.unsqueeze(1).unsqueeze(-1)
+        # Processing data
+        feats = model.extract_feat(raw_data)
+        audio_features = feats[6].squeeze(0).squeeze(-1).T
+        # output shape (7,1024)
+    # Apply pooling (if required)
     if t_pooling is not None:
         return pooling(audio_features, t_pooling)
     else:
