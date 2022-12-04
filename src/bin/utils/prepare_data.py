@@ -16,7 +16,6 @@ import os
 import sys
 import subprocess
 import pandas as pd
-import math
 from argparse import ArgumentParser, Namespace
 
 OUT_DF_COLUMNS = ['file_name', 'label', 'original_file_name', 'start_time', 'end_time']
