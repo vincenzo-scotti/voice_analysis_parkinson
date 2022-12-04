@@ -26,18 +26,18 @@ class FeaturesCache:
         # Identify specific features cache path
         cache_path = os.path.join(cache_dir_path, feature_id + '.pbz2')
         # Load cache if available otherwise generate it
-        if self.cache_path is None or not self.cache_path == cache_path:
+        if FeaturesCache.cache_path is None or not FeaturesCache.cache_path == cache_path:
             # Set cache path static variable
-            self.cache_path = cache_path
+            FeaturesCache.cache_path = cache_path
             # Manage cache mapping
-            if os.path.exists(self.cache_path):
+            if os.path.exists(FeaturesCache.cache_path):
                 # Load file if it exists
-                self._load_cache_file()
+                FeaturesCache._load_cache_file()
             else:
                 # Init cache data static variable
-                self.cache_data = dict()
+                FeaturesCache.cache_data = dict()
                 # Create cache file
-                self._update_cache_file()
+                FeaturesCache._update_cache_file()
 
     @staticmethod
     def get_cached_features(file_path: str) -> Optional[np.ndarray]:
