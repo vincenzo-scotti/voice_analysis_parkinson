@@ -38,7 +38,7 @@ def main(args: Namespace):
                     os.path.splitext(row.file_name)[0] + f'_{str(idx).zfill(3)}' + '.wav'
             ).replace(os.path.sep, '_')
             output_file_path = os.path.join(args.dest_dir_path, output_file_name)
-            if not isinstance(row.start_time, str) and not isinstance(row.end_time, str) and (math.isnan(row.start_time) or math.isnan(row.end_time)):
+            if row[['start_time', 'end_time']].isnull().values.any():
                 # If no timing is given simply copy/convert audio file
                 subprocess.run([
                     'ffmpeg',
