@@ -1,5 +1,6 @@
 # Global
 random_seed: 42
+cache_path: ./resources/data/cache/
 # Experiment
 experiments_dir: ./experiments/
 # Languages
