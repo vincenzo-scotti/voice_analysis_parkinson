@@ -1,6 +1,6 @@
 # Voice Analysis for Parkinson's Disease
 
-Codebase for the papers "[An Analysis of Features for Parkinson's Disease Detection in Hindi]()" and "[Cross-Lingual Transferability of Voice Analysis Models: a Parkinson's Disease Case Study]()". 
+Codebase for the papers "[An Analysis of Features for Parkinson's Disease Detection in Hindi](https://www.overleaf.com/read/dfzwqkspnxxp)" and "[Cross-Lingual Transferability of Voice Analysis Models: a Parkinson's Disease Case Study]()". 
 For all the references, contributions and credits, please refer to the paper.
 
 This code was initially developed as part of the M.Sc. Thesis in Computer Science and Engineering "[Cross-Lingual Transferability of Voice Analysis Models: a Parkinson's Disease Case Study](https://www.overleaf.com/read/tkbjcxxjrzjb)".
