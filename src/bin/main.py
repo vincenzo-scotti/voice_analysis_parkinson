@@ -69,6 +69,7 @@ def main(args: Namespace):
     src_language_metadata_df = pd.read_csv(os.path.join(configs['src_lang_dir'], 'metadata.csv'))
     X_src_paths: List[str] = [
         os.path.join(configs['src_lang_dir'], file_name) for file_name in src_language_metadata_df.file_name
+        if os.path.exists(os.path.join(configs['src_lang_dir'], file_name))
     ]
     X_src_idxs: np.ndarray = np.arange(len(X_src_paths))
     y_src_labels: np.ndarray = le.fit_transform([label for label in src_language_metadata_df.label])
@@ -81,6 +82,7 @@ def main(args: Namespace):
     tgt_language_metadata_df = pd.read_csv(os.path.join(configs['tgt_lang_dir'], 'metadata.csv'))
     X_tgt_paths: List[str] = [
         os.path.join(configs['tgt_lang_dir'], file_name) for file_name in tgt_language_metadata_df.file_name
+        if os.path.exists(os.path.join(configs['tgt_lang_dir'], file_name))
     ]
     y_tgt_labels: np.ndarray = le.transform([label for label in tgt_language_metadata_df.label])
 
@@ -93,13 +95,13 @@ def main(args: Namespace):
         # Extract feature sequences
         X_src: List[np.ndarray] = [
             FEATURE_EXTRACTORS[feature](
-                path
+                path, cache_dir_path=configs.get('cache_path')
             )
             for path in X_src_paths
         ]
         X_tgt: List[np.ndarray] = [
             FEATURE_EXTRACTORS[feature](
-                path
+                path, cache_dir_path=configs.get('cache_path')
             )
             for path in X_tgt_paths
         ]
@@ -110,18 +112,29 @@ def main(args: Namespace):
         X_src_test: List[np.ndarray] = [X_src[i] for i in X_src_test_idxs]
         X_src_test_duration: List[float] = [X_src_duration[i] for i in X_src_test_idxs]
 
+        # TODO find better solution for corrupted data management
+        X_src_train_tmp, y_src_train_tmp, X_src_train_duration_tmp = [*zip(*[
+            (x, y, d) for x, y, d in zip(X_src_train, y_src_train, X_src_train_duration) if x is not None
+        ])]
+        X_src_test_tmp, y_src_test_tmp, X_src_test_duration_tmp = [*zip(*[
+            (x, y, d) for x, y, d in zip(X_src_test, y_src_test, X_src_test_duration) if x is not None
+        ])]
+        X_tgt_tmp, y_tgt_labels_tmp, X_tgt_duration_tmp = [*zip(*[
+            (x, y, d) for x, y, d in zip(X_tgt, y_tgt_labels, X_tgt_duration) if x is not None
+        ])]
+
         # Apply chunking to all feature maps and and train-test splitting to source data
         X_src_train, y_src_train_split = list(zip(*sum([
             trunc_audio(X, y, d, chunk_len=configs.get('chunk_duration', 4.0))
-            for X, y, d in zip(X_src_train, y_src_train, X_src_train_duration)
+            for X, y, d in zip(X_src_train_tmp, y_src_train_tmp, X_src_train_duration_tmp)
         ], [])))
         X_src_test, y_src_test_split = list(zip(*sum([
             trunc_audio(X, y, d, chunk_len=configs.get('chunk_duration', 4.0))
-            for X, y, d in zip(X_src_test, y_src_test, X_src_test_duration)
+            for X, y, d in zip(X_src_test_tmp, y_src_test_tmp, X_src_test_duration_tmp)
         ], [])))
         X_tgt, y_tgt_labels_split = list(zip(*sum([
             trunc_audio(X, y, d, chunk_len=configs.get('chunk_duration', 4.0))
-            for X, y, d in zip(X_tgt, y_tgt_labels, X_tgt_duration)
+            for X, y, d in zip(X_tgt_tmp, y_tgt_labels_tmp, X_tgt_duration_tmp)
         ], [])))
 
         # For each pooling approach
