@@ -1,9 +1,9 @@
 # Voice Analysis for Parkinson's Disease
 
-Codebase for the papers "[An Analysis of Features for Parkinson's Disease Detection in Hindi](https://www.overleaf.com/read/dfzwqkspnxxp)" and "[Cross-Lingual Transferability of Voice Analysis Models: a Parkinson's Disease Case Study]()". 
+Codebase for the papers "[An Analysis of Features for Parkinson's Disease Detection in Hindi](https://www.overleaf.com/read/dfzwqkspnxxp)" and "[Cross-Lingual Transferability of Voice Analysis Models: a Parkinson's Disease Case Study]()" ([extended abstarct](https://www.overleaf.com/read/wtjyqvpnngwg)). 
 For all the references, contributions and credits, please refer to the paper.
 
-This code was initially developed as part of the M.Sc. Thesis in Computer Science and Engineering "[Cross-Lingual Transferability of Voice Analysis Models: a Parkinson's Disease Case Study](https://www.overleaf.com/read/tkbjcxxjrzjb)".
+This code was initially developed as part of the M.Sc. Thesis in Computer Science and Engineering "[Cross-Lingual Transferability of Voice Analysis Models: a Parkinson's Disease Case Study](https://www.overleaf.com/read/tkbjcxxjrzjb)" ([executive summary](https://www.overleaf.com/read/qdszgphmhcsd)).
 The M.Sc. degree was released by the Dipartimento di Elettronica, Informazione e Bioingengeria  ([DEIB](https://www.deib.polimi.it/eng/home-page)) of the Politecnico di Milano University ([PoliMI](https://www.unitn.it)).
 The Thesis was supervised at PoliMI by the staff of the [ARCSlab](https://arcslab.dei.polimi.it).
 
