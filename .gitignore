@@ -129,14 +129,14 @@ dmypy.json
 .pyre/
 
 # Data directories and files
-resources/data/*
+resources/data/
 !resources/data/README.md
 !resources/data/**/metadata.csv
 
 # Models directories and files
-resources/models/*
+resources/models/
 !resources/models/README.md
 
 # Experiments directories
-experiments/*
+experiments/
 !experiments/README.md
