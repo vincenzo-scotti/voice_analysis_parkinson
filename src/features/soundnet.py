@@ -102,7 +102,7 @@ def get_soundnet_features(
         cache = FeaturesCache(cache_dir_path, 'soundnet')
         audio_features = cache.get_cached_features(file_path)
     else:
-        audio_features = None
+        cache = audio_features = None
     # If not in cache load
     if audio_features is None:
         raw_data, sample_rate = torchaudio.load(file_path)
@@ -114,6 +114,9 @@ def get_soundnet_features(
         feats = model.extract_feat(raw_data)
         audio_features = feats[6].squeeze(0).squeeze(-1).T
         # output shape (7,1024)
+        # Cache data if needed
+        if cache is not None:
+            cache.cache_features(file_path, audio_features)
     # Apply pooling (if required)
     if t_pooling is not None:
         return pooling(audio_features, t_pooling)

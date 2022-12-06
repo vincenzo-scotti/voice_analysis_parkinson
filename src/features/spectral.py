@@ -78,7 +78,7 @@ def get_spectral_features(
         cache = FeaturesCache(cache_dir_path, 'spectral')
         audio_features = cache.get_cached_features(file_path)
     else:
-        audio_features = None
+        cache = audio_features = None
     # If not in cache load
     if audio_features is None:
         data, sample_rate = librosa.load(file_path, sr=SAMPLE_RATE)
@@ -97,6 +97,9 @@ def get_spectral_features(
         # matrix join of columns
         final_features = np.append(mfcc_features, acustic_features, axis=1)
         # print(final_features, final_features.shape)
+        # Cache data if needed
+        if cache is not None:
+            cache.cache_features(file_path, final_features)
     # Apply pooling (if required)
     if t_pooling is not None:
         return pooling(final_features, t_pooling)
