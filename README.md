@@ -7,8 +7,6 @@ This code was initially developed as part of the M.Sc. Thesis in Computer Scienc
 The M.Sc. degree was released by the Dipartimento di Elettronica, Informazione e Bioingengeria  ([DEIB](https://www.deib.polimi.it/eng/home-page)) of the Politecnico di Milano University ([PoliMI](https://www.unitn.it)).
 The Thesis was supervised at PoliMI by the staff of the [ARCSlab](https://arcslab.dei.polimi.it).
 
-*N.B. Title is temporary*
-
 ## Repository structure
 
 This repository is organised into four main directories:
@@ -75,7 +73,7 @@ python ./src/bin/main.py --configs_file_path ./resources/configs/path/to/config.
 To run the script in background:
 
 ```bash
-nohup python ./src/bin/main.py --config_file_path ./resources/configs/path/to/config.yaml > experiment_"$(date '+%Y_%m_%d_%H_%M_%S')".out &
+nohup python ./src/bin/main.py --configs_file_path ./resources/configs/path/to/config.yaml > experiment_"$(date '+%Y_%m_%d_%H_%M_%S')".out &
 ``` 
 
 ## References
