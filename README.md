@@ -55,6 +55,8 @@ To add the source code directory to the Python path, you can add this line to th
 export PYTHONPATH=$PYTHONPATH:/path/to/voice_analysis_parkinson/src
 ```
 
+Finally, make sure that [FFMpeg](https://ffmpeg.org) is installed and available on `$PATH`.
+
 ## Data preprocessing
 
 There are two scripts for data preprocessing in `./src/bin/utils/`:
