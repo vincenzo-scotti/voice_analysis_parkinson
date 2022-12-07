@@ -43,7 +43,6 @@ def main(args: Namespace):
                     'ffmpeg',
                     '-y',
                     '-i', os.path.join(args.source_dir_path, row.file_name),
-                    '-c', 'copy',
                     output_file_path
                 ])
             else:
