@@ -30,13 +30,13 @@ def get_wav2vec_features(
 ) -> np.ndarray:
     # Look in cache
     if cache_dir_path is not None:
-        cache = FeaturesCache(cache_dir_path, 'soundnet')
+        cache = FeaturesCache(cache_dir_path, 'wav2vec')
         audio_features = cache.get_cached_features(file_path)
     else:
         cache = audio_features = None
     # If not in cache load
     if audio_features is None:
-        raw_data, sample_rate = load_audio(file_path, tgt_len=tgt_len,sr=16000)
+        raw_data, sample_rate = load_audio(file_path, tgt_len=tgt_len, sr=16000)
         model, processor = get_wav2vec()
 
         # processing data, model pretrained needs sr of 16kHz
