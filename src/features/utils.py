@@ -84,32 +84,42 @@ def load_audio(file_path: str, tgt_len: Optional[float] = None, sr: Optional[int
 
 
 # TODO add function chucking to split the audio
-def trunc_audio(x, y, d, chunk_len=4.0) -> List[Tuple[np.ndarray,np.ndarray]]:
-    list_chunks =[]
+def trunc_audio(x, y, d, chunk_len=4.0) -> List[Tuple[np.ndarray, np.ndarray]]:
+    '''
+        #durata totale : #campioni_totali = durata chunk  : #campioni_chunk
+        sample_number = x.shape[0]
+        chunk_sample_number = int(((chunk_len * sample_number) // d))
+        # 'median' o 'edge' (entrambe le direzioni)
+
+        #split matrix of features, chunk starts from 0
+        diff = chunk_sample_number - (sample_number % chunk_sample_number)
+        x=np.pad(x, ((diff // 2, math.ceil(diff / 2)), (0, 0)), 'edge')
+        for chunk in range(0,windows_number):
+            start_x = chunk * chunk_sample_number
+            list_chunks.append(x[start_x:start_x+chunk_sample_number,:])
+
+        final_list_chunks = [(elem, y) for elem in list_chunks]
+        return final_list_chunks
+    '''
     windows_number = int(math.ceil(d / chunk_len))
-    #durata totale : #campioni_totali = durata chunk  : #campioni_chunk
-    sample_number = x.shape[0]
-    chunk_sample_number = int(((chunk_len * sample_number) // d))
-    # 'median' o 'edge' (entrambe le direzioni)
 
-    #split matrix of features, chunk starts from 0
-    diff = chunk_sample_number - (sample_number % chunk_sample_number)
-    x=np.pad(x, ((diff // 2, math.ceil(diff / 2)), (0, 0)), 'edge')
-    for chunk in range(0,windows_number):
-        start_x = chunk * chunk_sample_number
-        list_chunks.append(x[start_x:start_x+chunk_sample_number,:])
+    chunk_len_samples = int(math.ceil((x.shape[0] * chunk_len) / d))
+    tgt_len_samples = windows_number * chunk_len_samples
+    diff_len_samples = tgt_len_samples - x.shape[0]
+    if diff_len_samples > 0:
+        x = np.pad(x, ((diff_len_samples // 2, int(math.ceil(diff_len_samples / 2))), (0, 0)), 'edge')
 
-    final_list_chunks = [(elem, y) for elem in list_chunks]
-    return final_list_chunks
-
+    list_chunks = [(x[i * chunk_len_samples:(i + 1) * chunk_len_samples], y) for i in range(windows_number)]
+    return list_chunks
 
 
 def pooling(data: np.ndarray, t_pooling: GlobalPooling) -> np.ndarray:
     if t_pooling == GlobalPooling.AVERAGE:
-        return np.nanmean(data, axis=0)
+        data = np.nanmean(data, axis=0)
     elif t_pooling == GlobalPooling.MAXIMUM:
-        return np.nanmax(data, axis=0)
+        data = np.nanmax(data, axis=0)
     else:
-        data = np.nan_to_num(data)
         # TODO do resampling
-        return data.reshape(-1)
+        data = data.reshape(-1)
+
+    return np.nan_to_num(data)

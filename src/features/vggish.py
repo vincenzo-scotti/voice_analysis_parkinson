@@ -30,18 +30,19 @@ def get_vggish_features(
     # If not in cache load
     if audio_features is None:
         model = get_vggish()
-
         #processing data
         tensor_audio_features = model.forward(file_path)
         audio_features = tensor_audio_features.detach().cpu().numpy()
+        if len(audio_features.shape) == 1:
+            audio_features = audio_features.reshape(1, -1)
         # Cache data if needed
         if cache is not None:
             cache.cache_features(file_path, audio_features)
-        # Apply pooling (if required)
-        if t_pooling is not None:
-            return pooling(audio_features, t_pooling)
-        else:
-            return audio_features
+    # Apply pooling (if required)
+    if t_pooling is not None:
+        return pooling(audio_features, t_pooling)
+    else:
+        return audio_features
 
 
 # #FOR DEBUG PURPOSE

@@ -100,6 +100,8 @@ def get_spectral_features(
         # Cache data if needed
         if cache is not None:
             cache.cache_features(file_path, final_features)
+    else:
+        final_features = audio_features
     # Apply pooling (if required)
     if t_pooling is not None:
         return pooling(final_features, t_pooling)
