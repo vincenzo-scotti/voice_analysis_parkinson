@@ -35,6 +35,7 @@ from sklearn.metrics import (
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.svm import SVC
+from sklearn.neural_network import MLPClassifier
 from adapt.feature_based import CORAL
 
 from features import GlobalPooling, pooling, FEATURE_EXTRACTORS, trunc_audio
@@ -66,25 +67,29 @@ def main(args: Namespace):
     le = LabelEncoder()
 
     # Load source language audio paths and labels
-    src_language_metadata_df = pd.read_csv(os.path.join(configs['src_lang_dir'], 'metadata.csv'))
-    X_src_paths: List[str] = [
-        os.path.join(configs['src_lang_dir'], file_name) for file_name in src_language_metadata_df.file_name
+    src_language_metadata_df = pd.read_csv(os.path.join(configs['src_lang_dir'], 'metadata.csv'))  # .sample(n=10, random_state=2)  # TODO remove sampling
+    X_src_paths: List[str]
+    X_src_paths, y_src_labels = [*zip(*[
+        (os.path.join(configs['src_lang_dir'], file_name), label)
+        for file_name, label in zip(src_language_metadata_df.file_name, src_language_metadata_df.label)
         if os.path.exists(os.path.join(configs['src_lang_dir'], file_name))
-    ]
+    ])]
     X_src_idxs: np.ndarray = np.arange(len(X_src_paths))
-    y_src_labels: np.ndarray = le.fit_transform([label for label in src_language_metadata_df.label])
+    y_src_labels: np.ndarray = le.fit_transform([label for label in y_src_labels])
     # Generate train-test split
     X_src_train_idxs, X_src_test_idxs, y_src_train, y_src_test = train_test_split(
         X_src_idxs, y_src_labels, random_state=configs.get('random_seed', None)
     )
 
     # Load target language audio paths and labels
-    tgt_language_metadata_df = pd.read_csv(os.path.join(configs['tgt_lang_dir'], 'metadata.csv'))
-    X_tgt_paths: List[str] = [
-        os.path.join(configs['tgt_lang_dir'], file_name) for file_name in tgt_language_metadata_df.file_name
+    tgt_language_metadata_df = pd.read_csv(os.path.join(configs['tgt_lang_dir'], 'metadata.csv'))  # .sample(n=10, random_state=2)  # TODO remove sampling
+    X_tgt_paths: List[str]
+    X_tgt_paths, y_tgt_labels = [*zip(*[
+        (os.path.join(configs['tgt_lang_dir'], file_name), label)
+        for file_name, label in zip(tgt_language_metadata_df.file_name, tgt_language_metadata_df.label)
         if os.path.exists(os.path.join(configs['tgt_lang_dir'], file_name))
-    ]
-    y_tgt_labels: np.ndarray = le.transform([label for label in tgt_language_metadata_df.label])
+    ])]
+    y_tgt_labels: np.ndarray = le.transform([label for label in y_tgt_labels])
 
     # Compute audio file durations in seconds
     X_src_duration: List[float] = [librosa.get_duration(filename=path) for path in X_src_paths]
@@ -161,6 +166,7 @@ def main(args: Namespace):
             for do_adaptation in [False, True]:
                 # Train classifier (on source data)
                 cls: SVC = SVC(probability=True)
+                # cls: MLPClassifier = MLPClassifier(hidden_layer_sizes=(256, 256))
                 if do_adaptation:
                     adapter = CORAL(random_state=configs.get('random_seed', None))
                     X_src_train_adapted = adapter.fit_transform(X_src_train, X_tgt)
