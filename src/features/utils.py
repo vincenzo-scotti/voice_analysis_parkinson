@@ -101,9 +101,8 @@ def trunc_audio(x, y, d, chunk_len=4.0) -> List[Tuple[np.ndarray, np.ndarray]]:
         final_list_chunks = [(elem, y) for elem in list_chunks]
         return final_list_chunks
     '''
-    windows_number = int(math.ceil(d / chunk_len))
-
     chunk_len_samples = int(math.ceil((x.shape[0] * chunk_len) / d))
+    windows_number = int(math.ceil(x.shape[0] / chunk_len_samples))
     tgt_len_samples = windows_number * chunk_len_samples
     diff_len_samples = tgt_len_samples - x.shape[0]
     if diff_len_samples > 0:
