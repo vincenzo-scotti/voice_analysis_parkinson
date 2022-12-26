@@ -21,7 +21,7 @@ from typing import List, Dict, Union, Tuple
 import numpy as np
 import pandas as pd
 
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.metrics import (
     classification_report,
     accuracy_score,
@@ -35,7 +35,6 @@ from sklearn.metrics import (
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.svm import SVC
-from sklearn.neural_network import MLPClassifier
 from adapt.feature_based import CORAL
 
 from features import GlobalPooling, pooling, FEATURE_EXTRACTORS, trunc_audio
@@ -142,42 +141,64 @@ def main(args: Namespace):
             for X, y, d in zip(X_tgt_tmp, y_tgt_labels_tmp, X_tgt_duration_tmp)
         ], [])))
 
+        try:
+            assert all(X_src_train[0].shape == x.shape for X in (X_src_train, X_src_test, X_tgt) for x in X)
+        except AssertionError:
+            # TODO find better solution, this is a temporary fix
+            n = min(x.shape[0] for X in (X_src_train, X_src_test, X_tgt) for x in X)
+            X_src_train = [x[:n] for x in X_src_train]
+            X_src_test = [x[:n] for x in X_src_test]
+            X_tgt = [x[:n] for x in X_tgt]
+
         # For each pooling approach
         for t_pooling in GlobalPooling:
             # Get source language features
-            X_src_train: np.ndarray = np.vstack([pooling(x, t_pooling)] for x in X_src_train)
-            X_src_test: np.ndarray = np.vstack([pooling(x, t_pooling)] for x in X_src_test)
+            X_src_train_vector: np.ndarray = np.vstack([pooling(x, t_pooling)] for x in X_src_train)
+            X_src_test_vector: np.ndarray = np.vstack([pooling(x, t_pooling)] for x in X_src_test)
             # Do standardisation
-            std_scaler: StandardScaler = StandardScaler().fit(X_src_train)
-            X_src_train: np.ndarray = std_scaler.transform(X_src_train)
-            X_src_test: np.ndarray = std_scaler.transform(X_src_test)
-            # Do PCA
-            pca: PCA = PCA(n_components=configs.get('pca_components', 0.9)).fit(X_src_train)
-            X_src_train: np.ndarray = pca.transform(X_src_train)
-            X_src_test: np.ndarray = pca.transform(X_src_test)
+            std_scaler_src: StandardScaler = StandardScaler()
+            X_src_train_vector: np.ndarray = std_scaler_src.fit_transform(X_src_train_vector)
+            X_src_test_vector: np.ndarray = std_scaler_src.transform(X_src_test_vector)
 
             # Get target language features
-            X_tgt: np.ndarray = np.vstack([pooling(x, t_pooling)] for x in X_tgt)
-            # Do standardisation (using already fit model from source language)
-            X_tgt: np.ndarray = std_scaler.transform(X_tgt)
-            # Do PCA (using already fit model from source language)
-            X_tgt: np.ndarray = pca.transform(X_tgt)
+            X_tgt_vector: np.ndarray = np.vstack([pooling(x, t_pooling)] for x in X_tgt)
+            # Do standardisation
+            std_scaler_tgt: StandardScaler = StandardScaler()
+            X_tgt_vector: np.ndarray = std_scaler_tgt.fit_transform(X_tgt_vector)
 
             for do_adaptation in [False, True]:
-                # Train classifier (on source data)
-                cls: SVC = SVC(probability=True)
-                # cls: MLPClassifier = MLPClassifier(hidden_layer_sizes=(256, 256))
                 if do_adaptation:
+                    # Fit and apply domain adaptation
                     adapter = CORAL(random_state=configs.get('random_seed', None))
-                    X_src_train_adapted = adapter.fit_transform(X_src_train, X_tgt)
-                    X_src_test_adapted = adapter.transform(X_src_test)
+                    X_src_train_vector_adapted = adapter.fit_transform(X_src_train_vector, X_tgt_vector)
+                    X_src_test_vector_adapted = adapter.transform(X_src_test_vector, domain='src')
+                    X_tgt_vector_adapted = adapter.transform(X_tgt_vector, domain='tgt')
+                    # Fit PCA
+                    pca: PCA = PCA(n_components=configs.get('pca_components', 0.9)).fit(
+                        np.vstack([X_src_train_vector_adapted, X_tgt_vector_adapted])
+                    )
                 else:
-                    X_src_train_adapted = X_src_train
-                    X_src_test_adapted = X_src_test
-                cls.fit(X_src_train_adapted, y_src_train_split)
+                    X_src_train_vector_adapted = X_src_train_vector
+                    X_src_test_vector_adapted = X_src_test_vector
+                    X_tgt_vector_adapted = X_tgt_vector
+                    # Fit PCA
+                    pca: PCA = PCA(n_components=configs.get('pca_components', 0.9)).fit(X_src_train_vector_adapted)
+
+                # Apply PCA on source
+                X_src_train_vector_adapted: np.ndarray = pca.transform(X_src_train_vector_adapted)
+                X_src_test_vector_adapted: np.ndarray = pca.transform(X_src_test_vector_adapted)
+                # Apply PCA on target
+                X_tgt_vector_adapted: np.ndarray = pca.transform(X_tgt_vector_adapted)
+
+                # Do cross validation to search for the classifier (on source data)
+                cv = GridSearchCV(SVC(probability=True), {'C': [0.8, 0.9, 1.0, 2.0]})
+                cv.fit(X_src_train_vector_adapted, y_src_train_split)
+                # Retain best classifier and compute the test scores
+                cls: SVC = cv.best_estimator_
+
                 # Test classifier (on source data)
-                y_src_test_pred = cls.predict(X_src_test_adapted)
-                y_src_test_proba = cls.predict_proba(X_src_test_adapted)[:, 1]
+                y_src_test_pred = cls.predict(X_src_test_vector_adapted)
+                y_src_test_proba = cls.predict_proba(X_src_test_vector_adapted)[:, 1]
 
                 src_cls_report = classification_report(y_src_test_split, y_src_test_pred)
                 src_accuracy_score = accuracy_score(y_src_test_split, y_src_test_pred)
@@ -191,8 +212,8 @@ def main(args: Namespace):
                 src_confusion_matrix = confusion_matrix(y_src_test_split, y_src_test_pred)
 
                 # Test classifier (on target data)
-                y_tgt_pred = cls.predict(X_tgt)
-                y_tgt_proba = cls.predict_proba(X_tgt)[:, 1]
+                y_tgt_pred = cls.predict(X_tgt_vector_adapted)
+                y_tgt_proba = cls.predict_proba(X_tgt_vector_adapted)[:, 1]
 
                 tgt_cls_report = classification_report(y_tgt_labels_split, y_tgt_pred)
                 tgt_accuracy_score = accuracy_score(y_tgt_labels_split, y_tgt_pred)
