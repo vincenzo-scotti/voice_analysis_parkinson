@@ -167,65 +167,72 @@ def main(args: Namespace):
             X_tgt_vector: np.ndarray = std_scaler_tgt.fit_transform(X_tgt_vector)
 
             for do_adaptation in [False, True]:
-                if do_adaptation:
-                    # Fit and apply domain adaptation
-                    adapter = CORAL(random_state=configs.get('random_seed', None))
-                    X_src_train_vector_adapted = adapter.fit_transform(X_src_train_vector, X_tgt_vector)
-                    X_src_test_vector_adapted = adapter.transform(X_src_test_vector, domain='src')
-                    X_tgt_vector_adapted = adapter.transform(X_tgt_vector, domain='tgt')
-                    # Fit PCA
-                    pca: PCA = PCA(n_components=configs.get('pca_components', 0.9)).fit(
-                        np.vstack([X_src_train_vector_adapted, X_tgt_vector_adapted])
-                    )
-                else:
-                    X_src_train_vector_adapted = X_src_train_vector
-                    X_src_test_vector_adapted = X_src_test_vector
-                    X_tgt_vector_adapted = X_tgt_vector
-                    # Fit PCA
+                try:
+                    if do_adaptation:
+                        # Fit and apply domain adaptation
+                        adapter = CORAL(random_state=configs.get('random_seed', None))
+                        X_src_train_vector_adapted = adapter.fit_transform(X_src_train_vector, X_tgt_vector)
+                        X_src_test_vector_adapted = adapter.transform(X_src_test_vector, domain='src')
+                        X_tgt_vector_adapted = adapter.transform(X_tgt_vector, domain='tgt')
+                        # Fit PCA
+                        # pca: PCA = PCA(n_components=configs.get('pca_components', 0.9)).fit(
+                        #     np.vstack([X_src_train_vector_adapted, X_tgt_vector_adapted])
+                        # )
+                    else:
+                        X_src_train_vector_adapted = X_src_train_vector
+                        X_src_test_vector_adapted = X_src_test_vector
+                        X_tgt_vector_adapted = X_tgt_vector
+                    '''# Fit PCA
                     pca: PCA = PCA(n_components=configs.get('pca_components', 0.9)).fit(X_src_train_vector_adapted)
+                    # Apply PCA on source
+                    X_src_train_vector_adapted: np.ndarray = pca.transform(X_src_train_vector_adapted)
+                    X_src_test_vector_adapted: np.ndarray = pca.transform(X_src_test_vector_adapted)
+                    # Apply PCA on target
+                    X_tgt_vector_adapted: np.ndarray = pca.transform(X_tgt_vector_adapted)'''
 
-                # Apply PCA on source
-                X_src_train_vector_adapted: np.ndarray = pca.transform(X_src_train_vector_adapted)
-                X_src_test_vector_adapted: np.ndarray = pca.transform(X_src_test_vector_adapted)
-                # Apply PCA on target
-                X_tgt_vector_adapted: np.ndarray = pca.transform(X_tgt_vector_adapted)
+                    # Do cross validation to search for the classifier (on source data)
+                    cv = GridSearchCV(SVC(probability=True), {'C': [0.8, 0.9, 1.0, 2.0]})
+                    cv.fit(X_src_train_vector_adapted, y_src_train_split)
+                    # Retain best classifier and compute the test scores
+                    cls: SVC = cv.best_estimator_
 
-                # Do cross validation to search for the classifier (on source data)
-                cv = GridSearchCV(SVC(probability=True), {'C': [0.8, 0.9, 1.0, 2.0]})
-                cv.fit(X_src_train_vector_adapted, y_src_train_split)
-                # Retain best classifier and compute the test scores
-                cls: SVC = cv.best_estimator_
+                    # Test classifier (on source data)
+                    y_src_test_pred = cls.predict(X_src_test_vector_adapted)
+                    y_src_test_proba = cls.predict_proba(X_src_test_vector_adapted)[:, 1]
 
-                # Test classifier (on source data)
-                y_src_test_pred = cls.predict(X_src_test_vector_adapted)
-                y_src_test_proba = cls.predict_proba(X_src_test_vector_adapted)[:, 1]
+                    src_cls_report = classification_report(y_src_test_split, y_src_test_pred)
+                    src_accuracy_score = accuracy_score(y_src_test_split, y_src_test_pred)
+                    src_precision_score, src_recall_score, src_fscore, src_support = precision_recall_fscore_support(
+                        y_src_test_split, y_src_test_pred, average='macro'
+                    )
+                    src_specificity_score = recall_score(y_src_test_split, y_src_test_pred, average='macro', pos_label=0)
+                    src_auc_score = roc_auc_score(y_src_test_split, y_src_test_proba)
+                    src_fpr, src_tpr, src_roc_threshold = roc_curve(y_src_test_split, y_src_test_proba)
+                    src_pr, src_rc, src_pr_rc_threshold = precision_recall_curve(y_src_test_split, y_src_test_proba)
+                    src_confusion_matrix = confusion_matrix(y_src_test_split, y_src_test_pred)
 
-                src_cls_report = classification_report(y_src_test_split, y_src_test_pred)
-                src_accuracy_score = accuracy_score(y_src_test_split, y_src_test_pred)
-                src_precision_score, src_recall_score, src_fscore, src_support = precision_recall_fscore_support(
-                    y_src_test_split, y_src_test_pred, average='macro'
-                )
-                src_specificity_score = recall_score(y_src_test_split, y_src_test_pred, average='macro', pos_label=0)
-                src_auc_score = roc_auc_score(y_src_test_split, y_src_test_proba)
-                src_fpr, src_tpr, src_roc_threshold = roc_curve(y_src_test_split, y_src_test_proba)
-                src_pr, src_rc, src_pr_rc_threshold = precision_recall_curve(y_src_test_split, y_src_test_proba)
-                src_confusion_matrix = confusion_matrix(y_src_test_split, y_src_test_pred)
+                    # Test classifier (on target data)
+                    y_tgt_pred = cls.predict(X_tgt_vector_adapted)
+                    y_tgt_proba = cls.predict_proba(X_tgt_vector_adapted)[:, 1]
 
-                # Test classifier (on target data)
-                y_tgt_pred = cls.predict(X_tgt_vector_adapted)
-                y_tgt_proba = cls.predict_proba(X_tgt_vector_adapted)[:, 1]
+                    tgt_cls_report = classification_report(y_tgt_labels_split, y_tgt_pred)
+                    tgt_accuracy_score = accuracy_score(y_tgt_labels_split, y_tgt_pred)
+                    tgt_precision_score, tgt_recall_score, tgt_fscore, tgt_support = precision_recall_fscore_support(
+                        y_tgt_labels_split, y_tgt_pred, average='macro'
+                    )
+                    tgt_specificity_score = recall_score(y_tgt_labels_split, y_tgt_pred, average='macro', pos_label=0)
+                    tgt_auc_score = roc_auc_score(y_tgt_labels_split, y_tgt_proba)
+                    tgt_fpr, tgt_tpr, tgt_roc_threshold = roc_curve(y_tgt_labels_split, y_tgt_proba)
+                    tgt_pr, tgt_rc, tgt_pr_rc_threshold = precision_recall_curve(y_tgt_labels_split, y_tgt_proba)
 
-                tgt_cls_report = classification_report(y_tgt_labels_split, y_tgt_pred)
-                tgt_accuracy_score = accuracy_score(y_tgt_labels_split, y_tgt_pred)
-                tgt_precision_score, tgt_recall_score, tgt_fscore, tgt_support = precision_recall_fscore_support(
-                    y_tgt_labels_split, y_tgt_pred, average='macro'
-                )
-                tgt_specificity_score = recall_score(y_tgt_labels_split, y_tgt_pred, average='macro', pos_label=0)
-                tgt_auc_score = roc_auc_score(y_tgt_labels_split, y_tgt_proba)
-                tgt_fpr, tgt_tpr, tgt_roc_threshold = roc_curve(y_tgt_labels_split, y_tgt_proba)
-                tgt_pr, tgt_rc, tgt_pr_rc_threshold = precision_recall_curve(y_tgt_labels_split, y_tgt_proba)
-
-                tgt_confusion_matrix = confusion_matrix(y_tgt_labels_split, y_tgt_pred)
+                    tgt_confusion_matrix = confusion_matrix(y_tgt_labels_split, y_tgt_pred)
+                except:
+                    src_cls_report = ''
+                    src_accuracy_score = src_specificity_score = src_auc_score = src_precision_score = src_recall_score = src_fscore = src_support = None
+                    src_fpr = src_tpr = src_roc_threshold = src_pr = src_rc = src_pr_rc_threshold = src_confusion_matrix = np.array([None])
+                    tgt_cls_report = ''
+                    tgt_accuracy_score = tgt_specificity_score = tgt_auc_score = tgt_precision_score = tgt_recall_score = tgt_fscore = tgt_support = None
+                    tgt_fpr = tgt_tpr = tgt_roc_threshold = tgt_pr = tgt_rc = tgt_pr_rc_threshold = tgt_confusion_matrix = np.array([None])
 
                 # Log results
                 with open(output_file_path, 'a') as f:
