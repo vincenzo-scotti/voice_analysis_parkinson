@@ -5,9 +5,9 @@ Data set(s) are available at the following links:
 
 - English:
     - [MDVR-KCL](https://zenodo.org/record/2867216#.YpSK3i0QPT9): Dataset of Mobile Device Voice Recordings at King's College London from both early and advanced Parkinson's disease patients hosted by [Zenodo](https://zenodo.org)
-- Hindi:
+- Telugu:
     - [Parkison corpus in Hindi](https://drive.google.com/drive/folders/1lBz_NhtP0o0uy3OMV6FAtTHkaA4Prmf-?usp=share_link): Private collection of voice recordings of Parkinson's disease patients in Hindi hosted by [Prof. Anitha S.Pillai](https://www.linkedin.com/in/anithaspillai/)
-    - [Common Voice (Hindi) Delta Segment 11.0](https://commonvoice.mozilla.org/en/datasets): Voice recordings in Hindi of people uttering sentences for ASR development hosted by [Mozilla](https://www.mozilla.org/)
+    - [Common Voice (Telugu) Delta Segment 11.0](https://commonvoice.mozilla.org/en/datasets): Voice recordings in Hindi of people uttering sentences for ASR development hosted by [Mozilla](https://www.mozilla.org/)
 - Italian:
     - [Italian Parkinson's Voice and Speech](https://ieee-dataport.org/open-access/italian-parkinsons-voice-and-speech): Voice recordings of Italian Parkinson's disease patients and healthy individuals, hosted by [IEEE Data Port](https://ieee-dataport.org/)
 

@@ -4,5 +4,5 @@ cache_path: ./resources/data/cache/
 # Experiment
 experiments_dir: ./experiments/
 # Languages
-src_lang_dir: ./resources/data/preprocessed/en/
-tgt_lang_dir: ./resources/data/preprocessed/hi/
+src_lang_dir: ./resources/data/preprocessed/te/
+tgt_lang_dir: ./resources/data/preprocessed/en/

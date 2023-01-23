@@ -1,6 +1,6 @@
 # Voice Analysis for Parkinson's Disease
 
-Codebase for the papers "[An Analysis of Features for Parkinson's Disease Detection in Hindi](https://www.overleaf.com/read/dfzwqkspnxxp)" and "[Cross-Lingual Transferability of Voice Analysis Models: a Parkinson's Disease Case Study]()" ([extended abstarct](https://www.overleaf.com/read/wtjyqvpnngwg)). 
+Codebase for the paper "[An Analysis of Features for Parkinson's Disease Detection in Telugu](https://www.overleaf.com/read/dfzwqkspnxxp)" and the extended abstract "[Cross-Lingual Transferability of Voice Analysis Models: a Parkinson's Disease Case Study](https://www.overleaf.com/read/wtjyqvpnngwg)". 
 For all the references, contributions and credits, please refer to the paper.
 
 This code was initially developed as part of the M.Sc. Thesis in Computer Science and Engineering "[Cross-Lingual Transferability of Voice Analysis Models: a Parkinson's Disease Case Study](https://www.overleaf.com/read/tkbjcxxjrzjb)" ([executive summary](https://www.overleaf.com/read/qdszgphmhcsd)).
@@ -14,7 +14,7 @@ This repository is organised into four main directories:
 - `experiments/` contains the directories to host:  
     - results of the experiments;
     - experiment configuration dumps.
-- `notebboks/` contains the Jupyter notebooks to do:  
+- `notebooks/` contains the Jupyter notebooks to do:  
     - data exploration;
     - results analysis.
 - `resources/` contains:

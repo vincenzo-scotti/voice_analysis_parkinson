@@ -14,6 +14,7 @@ from datetime import datetime
 from argparse import ArgumentParser, Namespace
 
 import librosa
+import sklearn.base
 import yaml
 
 from typing import List, Dict, Union, Tuple
@@ -35,6 +36,7 @@ from sklearn.metrics import (
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.svm import SVC
+from sklearn.neural_network import MLPClassifier
 from adapt.feature_based import CORAL
 
 from features import GlobalPooling, pooling, FEATURE_EXTRACTORS, trunc_audio
@@ -192,9 +194,17 @@ def main(args: Namespace):
 
                     # Do cross validation to search for the classifier (on source data)
                     cv = GridSearchCV(SVC(probability=True), {'C': [0.8, 0.9, 1.0, 2.0]})
+                    '''cv = GridSearchCV(
+                        MLPClassifier(batch_size=32, random_state=configs.get('random_seed', None), early_stopping=True),
+                        {
+                            'hidden_layer_sizes': [(128,), (128, 128), (256,), (256, 256), (512,), (512, 512)],
+                            'alpha': [1.e-2, 1.e-3, 1.e-4],
+                            'learning_rate_init': [1.e-3, 1.e-4]
+                        }
+                    )'''
                     cv.fit(X_src_train_vector_adapted, y_src_train_split)
                     # Retain best classifier and compute the test scores
-                    cls: SVC = cv.best_estimator_
+                    cls = cv.best_estimator_
 
                     # Test classifier (on source data)
                     y_src_test_pred = cls.predict(X_src_test_vector_adapted)
