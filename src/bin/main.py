@@ -14,10 +14,9 @@ from datetime import datetime
 from argparse import ArgumentParser, Namespace
 
 import librosa
-import sklearn.base
 import yaml
 
-from typing import List, Dict, Union, Tuple
+from typing import List, Dict, Union, Tuple, Optional
 
 import numpy as np
 import pandas as pd
@@ -34,12 +33,41 @@ from sklearn.metrics import (
     confusion_matrix
 )
 from sklearn.preprocessing import LabelEncoder, StandardScaler
-from sklearn.decomposition import PCA
-from sklearn.svm import SVC
-from sklearn.neural_network import MLPClassifier
-from adapt.feature_based import CORAL
+from adapt.feature_based import DeepCORAL
 
 from features import GlobalPooling, pooling, FEATURE_EXTRACTORS, trunc_audio
+
+from tensorflow.keras import Model, Sequential
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.layers import Dense, Input, Dropout
+from scikeras.wrappers import KerasClassifier
+from tensorflow.keras.callbacks import EarlyStopping
+
+
+def create_task_nn(
+        input_shape: Optional[Tuple[int]] = None,
+        n_classes: int = 2,
+        hidden_units: Optional[Union[int, List[int]]] = None,
+        dropout_rate: float = 0.1
+) -> Model:
+    if hidden_units is None:
+        hidden_units = []
+    elif isinstance(hidden_units, int):
+        hidden_units = [hidden_units]
+
+    model = Sequential()
+    if input_shape is not None:
+        model.add(Input(shape=input_shape))
+    for n_hidden in hidden_units:
+        model.add(Dropout(dropout_rate))
+        model.add(Dense(n_hidden, activation='relu'))
+    model.add(Dropout(dropout_rate))
+    if n_classes == 2:
+        model.add(Dense(1, activation='sigmoid'))
+    else:
+        model.add(Dense(n_classes, activation='softmax'))
+
+    return model
 
 
 def main(args: Namespace):
@@ -171,45 +199,67 @@ def main(args: Namespace):
             for do_adaptation in [False, True]:
                 try:
                     if do_adaptation:
-                        # Fit and apply domain adaptation
-                        adapter = CORAL(random_state=configs.get('random_seed', None))
-                        X_src_train_vector_adapted = adapter.fit_transform(X_src_train_vector, X_tgt_vector)
-                        X_src_test_vector_adapted = adapter.transform(X_src_test_vector, domain='src')
-                        X_tgt_vector_adapted = adapter.transform(X_tgt_vector, domain='tgt')
-                        # Fit PCA
-                        # pca: PCA = PCA(n_components=configs.get('pca_components', 0.9)).fit(
-                        #     np.vstack([X_src_train_vector_adapted, X_tgt_vector_adapted])
-                        # )
-                    else:
-                        X_src_train_vector_adapted = X_src_train_vector
-                        X_src_test_vector_adapted = X_src_test_vector
-                        X_tgt_vector_adapted = X_tgt_vector
-                    '''# Fit PCA
-                    pca: PCA = PCA(n_components=configs.get('pca_components', 0.9)).fit(X_src_train_vector_adapted)
-                    # Apply PCA on source
-                    X_src_train_vector_adapted: np.ndarray = pca.transform(X_src_train_vector_adapted)
-                    X_src_test_vector_adapted: np.ndarray = pca.transform(X_src_test_vector_adapted)
-                    # Apply PCA on target
-                    X_tgt_vector_adapted: np.ndarray = pca.transform(X_tgt_vector_adapted)'''
+                        # Wrap into adapter if required
+                        cv = GridSearchCV(
+                            estimator=DeepCORAL(
+                                encoder=Sequential([Input(shape=X_src_train_vector.shape[1:])]),
+                                loss='binary_crossentropy',
+                                Xt=X_tgt_vector,
+                                metrics=['accuracy'],
+                                validation_split=0.2,
+                                epochs=150,
+                                random_state=configs.get('random_seed', None),
+                                batch_size=8,
+                                verbose=0,
+                                callbacks=[EarlyStopping(monitor='val_accuracy', patience=5)]
+                            ),
+                            param_grid=[
+                                {
+                                    'task': create_task_nn(
+                                        input_shape=X_src_train_vector.shape[1:],
+                                        hidden_units=hidden_units
+                                    ),
+                                    'optimizer': Adam(learning_rate=lr)
+                                }
+                                for hidden_units in [[512], [512, 512], [1024], [1024, 1024]]
+                                for lr in [1e-3, 1e-4]
+                            ]
+                        )
+                        cv.fit(X_src_train_vector, y_src_train_split)
 
-                    # Do cross validation to search for the classifier (on source data)
-                    cv = GridSearchCV(SVC(probability=True), {'C': [0.8, 0.9, 1.0, 2.0]})
-                    '''cv = GridSearchCV(
-                        MLPClassifier(batch_size=32, random_state=configs.get('random_seed', None), early_stopping=True),
-                        {
-                            'hidden_layer_sizes': [(128,), (128, 128), (256,), (256, 256), (512,), (512, 512)],
-                            'alpha': [1.e-2, 1.e-3, 1.e-4],
-                            'learning_rate_init': [1.e-3, 1.e-4]
-                        }
-                    )'''
-                    cv.fit(X_src_train_vector_adapted, y_src_train_split)
-                    # Retain best classifier and compute the test scores
-                    cls = cv.best_estimator_
+                        # Retain best classifier and compute the test scores
+                        cls = cv.best_estimator_.task_
+                    else:
+                        cv = GridSearchCV(
+                            estimator=KerasClassifier(
+                                model=create_task_nn,
+                                loss="binary_crossentropy",
+                                optimizer="adam",
+                                metrics=['accuracy'],
+                                epochs=150,
+                                batch_size=8,
+                                validation_split=0.2,
+                                verbose=0,
+                                callbacks=[EarlyStopping(monitor='val_accuracy', patience=5)]
+                            ),
+                            param_grid={
+                                'model__input_shape': [X_src_train_vector.shape[1:]],
+                                'model__hidden_units': [[512], [512, 512], [1024], [1024, 1024]],
+                                'optimizer__learning_rate': [1e-3, 1e-4]
+                            }
+                        )
+                        cv.fit(X_src_train_vector, y_src_train_split)
+
+                        # Retain best classifier and compute the test scores
+                        cls = cv.best_estimator_
+
+                    # Get predictions
+                    y_src_test_pred = cls.predict(X_src_test_vector)
+                    y_src_test_proba = cls.predict_proba(X_src_test_vector)
+                    y_tgt_pred = cls.predict(X_tgt_vector)
+                    y_tgt_proba = cls.predict_proba(X_tgt_vector)
 
                     # Test classifier (on source data)
-                    y_src_test_pred = cls.predict(X_src_test_vector_adapted)
-                    y_src_test_proba = cls.predict_proba(X_src_test_vector_adapted)[:, 1]
-
                     src_cls_report = classification_report(y_src_test_split, y_src_test_pred)
                     src_accuracy_score = accuracy_score(y_src_test_split, y_src_test_pred)
                     src_precision_score, src_recall_score, src_fscore, src_support = precision_recall_fscore_support(
@@ -222,9 +272,6 @@ def main(args: Namespace):
                     src_confusion_matrix = confusion_matrix(y_src_test_split, y_src_test_pred)
 
                     # Test classifier (on target data)
-                    y_tgt_pred = cls.predict(X_tgt_vector_adapted)
-                    y_tgt_proba = cls.predict_proba(X_tgt_vector_adapted)[:, 1]
-
                     tgt_cls_report = classification_report(y_tgt_labels_split, y_tgt_pred)
                     tgt_accuracy_score = accuracy_score(y_tgt_labels_split, y_tgt_pred)
                     tgt_precision_score, tgt_recall_score, tgt_fscore, tgt_support = precision_recall_fscore_support(
