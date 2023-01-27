@@ -10,3 +10,4 @@ adapt==0.4.2
 transformers==4.25.1
 torchaudio==0.13.0
 jupyterlab==3.5.0
+scikeras==0.10.0
