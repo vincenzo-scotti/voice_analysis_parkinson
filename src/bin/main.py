@@ -35,11 +35,13 @@ from sklearn.metrics import (
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from adapt.feature_based import DeepCORAL
 
-from features import GlobalPooling, pooling, FEATURE_EXTRACTORS, trunc_audio
+from features import GlobalPooling, FEATURE_EXTRACTORS, trunc_audio
 
-from tensorflow.keras import Model, Sequential
+from tensorflow.keras import Sequential
+from tensorflow.keras.layers import Input, SeparableConv1D, Dense, Flatten
+from tensorflow.keras.layers import GlobalMaxPooling1D, GlobalAveragePooling1D
+from tensorflow.keras.layers import Dropout
 from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.layers import Dense, Input, Dropout
 from tensorflow.keras.callbacks import EarlyStopping
 from scikeras.wrappers import KerasClassifier
 
@@ -48,8 +50,9 @@ def create_nn(
         input_shape: Optional[Tuple[int]] = None,
         n_classes: Optional[int] = 2,
         hidden_units: Optional[Union[int, List[int]]] = None,
+        pooling: Optional[GlobalPooling] = None,
         dropout_rate: float = 0.1
-) -> Model:
+):
     if hidden_units is None:
         hidden_units = []
     elif isinstance(hidden_units, int):
@@ -60,7 +63,14 @@ def create_nn(
         model.add(Input(shape=input_shape))
     for n_hidden in hidden_units:
         model.add(Dropout(dropout_rate))
-        model.add(Dense(n_hidden, activation='relu'))
+        model.add(SeparableConv1D(n_hidden, 3, padding='same', activation='relu'))
+    if pooling is not None:
+        if pooling == GlobalPooling.AVERAGE:
+            model.add(GlobalAveragePooling1D())
+        elif pooling == GlobalPooling.MAXIMUM:
+            model.add(GlobalMaxPooling1D())
+        else:
+            model.add(Flatten())
     if n_classes is not None:
         model.add(Dropout(dropout_rate))
         if n_classes == 2:
@@ -185,22 +195,52 @@ def main(args: Namespace):
             X_src_test = [x[:n] for x in X_src_test]
             X_tgt = [x[:n] for x in X_tgt]
 
+        # Get source language features
+        X_src_train_tensor: np.ndarray = np.vstack([x[None, ...] for x in X_src_train])
+        X_src_test_tensor: np.ndarray = np.vstack([x[None, ...] for x in X_src_test])
+        # Remove nan values
+        X_src_train_tensor = np.nan_to_num(X_src_train_tensor)
+        X_src_test_tensor = np.nan_to_num(X_src_test_tensor)
+        # Do standardisation
+        std_scaler_src: StandardScaler = StandardScaler()
+        tmp_n_samples: int
+        tmp_n_channels: int
+        tmp_n_samples, _, tmp_n_channels = X_src_train_tensor.shape
+        X_src_train_tensor: np.ndarray = std_scaler_src.fit_transform(
+            X_src_train_tensor.reshape(-1, tmp_n_channels)
+        ).reshape(tmp_n_samples, -1, tmp_n_channels)
+        tmp_n_samples, _, tmp_n_channels = X_src_test_tensor.shape
+        X_src_test_tensor: np.ndarray = std_scaler_src.transform(
+            X_src_test_tensor.reshape(-1, tmp_n_channels)
+        ).reshape(tmp_n_samples, -1, tmp_n_channels)
+
+        # Get target language features
+        X_tgt_tensor: np.ndarray = np.vstack([x[None, ...] for x in X_tgt])
+        # Remove nan values
+        X_tgt_tensor = np.nan_to_num(X_tgt_tensor)
+        # Do standardisation
+        std_scaler_tgt: StandardScaler = StandardScaler()
+        tmp_n_samples, _, tmp_n_channels = X_tgt_tensor.shape
+        X_tgt_tensor: np.ndarray = std_scaler_tgt.fit_transform(
+            X_tgt_tensor.reshape(-1, tmp_n_channels)
+        ).reshape(tmp_n_samples, -1, tmp_n_channels)
+
+        # Apply minority oversampling to balance the source training data
+        lbl_ids, counts = np.unique(y_src_train_split, return_counts=True)
+        majority_count = counts.max()
+        for lbl, count in zip(lbl_ids, counts):
+            if count < majority_count:
+                n_resample = majority_count - count
+                X_src_train_tensor = np.vstack([
+                    X_src_train_tensor,
+                    X_src_train_tensor[
+                        np.random.choice(np.arange(len(X_src_train_tensor))[y_src_train_split == lbl], size=n_resample)
+                    ]
+                ])
+                y_src_train_split = np.concatenate([y_src_train_split, np.full(n_resample, lbl)])
+
         # For each pooling approach
         for t_pooling in GlobalPooling:
-            # Get source language features
-            X_src_train_vector: np.ndarray = np.vstack([pooling(x, t_pooling)] for x in X_src_train)
-            X_src_test_vector: np.ndarray = np.vstack([pooling(x, t_pooling)] for x in X_src_test)
-            # Do standardisation
-            std_scaler_src: StandardScaler = StandardScaler()
-            X_src_train_vector: np.ndarray = std_scaler_src.fit_transform(X_src_train_vector)
-            X_src_test_vector: np.ndarray = std_scaler_src.transform(X_src_test_vector)
-
-            # Get target language features
-            X_tgt_vector: np.ndarray = np.vstack([pooling(x, t_pooling)] for x in X_tgt)
-            # Do standardisation
-            std_scaler_tgt: StandardScaler = StandardScaler()
-            X_tgt_vector: np.ndarray = std_scaler_tgt.fit_transform(X_tgt_vector)
-
             # Search for best DNN config given the features
             cv = GridSearchCV(
                 estimator=KerasClassifier(
@@ -215,8 +255,8 @@ def main(args: Namespace):
                     callbacks=[EarlyStopping(monitor='val_accuracy', patience=5)]
                 ),
                 param_grid={
-                    'model__input_shape': [X_src_train_vector.shape[1:]],
-                    # 'model__hidden_units': [[256], [256, 256], [512], [512, 512], [1024], [1024, 1024]],
+                    'model__input_shape': [X_src_train_tensor.shape[1:]],
+                    'model__pooling': [t_pooling],
                     'model__hidden_units': [
                         [512], [512, 512], [512, 512, 512], [1024], [1024, 1024], [1024, 1024, 1024]
                     ],
@@ -224,26 +264,28 @@ def main(args: Namespace):
                     'optimizer__learning_rate': [1e-3, 1e-4]
                 }
             )
-            cv.fit(X_src_train_vector, y_src_train_split)
+            cv.fit(X_src_train_tensor, y_src_train_split)
 
             # Retain best classifier and compute the test scores
             base_cls = cv.best_estimator_
 
+            # Fit adapter version
             adapter = DeepCORAL(
                 encoder=create_nn(
-                    input_shape=X_src_train_vector.shape[1:],
+                    input_shape=X_src_train_tensor.shape[1:],
                     n_classes=None,
                     hidden_units=cv.best_params_['model__hidden_units'],
                     dropout_rate=cv.best_params_['model__dropout_rate']
                 ),
                 task=create_nn(
+                    pooling=t_pooling,
                     dropout_rate=cv.best_params_['model__dropout_rate']
                 ),
                 optimizer=Adam(learning_rate=cv.best_params_['optimizer__learning_rate']),
                 optimizer_enc=Adam(learning_rate=cv.best_params_['optimizer__learning_rate']),
                 loss='binary_crossentropy',
                 lambda_=0.1,
-                Xt=X_tgt_vector,
+                Xt=X_tgt_tensor,
                 metrics=['accuracy'],
                 validation_split=0.2,
                 epochs=150,
@@ -252,22 +294,21 @@ def main(args: Namespace):
                 verbose=0,
                 callbacks=[EarlyStopping(monitor='val_accuracy', patience=5)]
             )
-            adapter.fit(X_src_train_vector, y_src_train_split)
+            adapter.fit(X_src_train_tensor, y_src_train_split)
 
             for do_adaptation, cls in zip([False, True], [base_cls, adapter]):
                 try:
                     # Get predictions
                     if do_adaptation:
-
-                        y_src_test_pred = (cls.predict(X_src_test_vector) >= 0.5).astype(int).reshape(-1)
-                        y_src_test_proba = cls.predict(X_src_test_vector).reshape(-1)
-                        y_tgt_pred = (cls.predict(X_tgt_vector) >= 0.5).astype(int)
-                        y_tgt_proba = cls.predict(X_tgt_vector).reshape(-1).reshape(-1)
+                        y_src_test_pred = (cls.predict(X_src_test_tensor) >= 0.5).astype(int).reshape(-1)
+                        y_src_test_proba = cls.predict(X_src_test_tensor).reshape(-1)
+                        y_tgt_pred = (cls.predict(X_tgt_tensor) >= 0.5).astype(int)
+                        y_tgt_proba = cls.predict(X_tgt_tensor).reshape(-1).reshape(-1)
                     else:
-                        y_src_test_pred = cls.predict(X_src_test_vector)
-                        y_src_test_proba = cls.predict_proba(X_src_test_vector)[:, 1]
-                        y_tgt_pred = cls.predict(X_tgt_vector)
-                        y_tgt_proba = cls.predict_proba(X_tgt_vector)[:, 1]
+                        y_src_test_pred = cls.predict(X_src_test_tensor)
+                        y_src_test_proba = cls.predict_proba(X_src_test_tensor)[:, 1]
+                        y_tgt_pred = cls.predict(X_tgt_tensor)
+                        y_tgt_proba = cls.predict_proba(X_tgt_tensor)[:, 1]
 
                     # Test classifier (on source data)
                     src_cls_report = classification_report(y_src_test_split, y_src_test_pred)
