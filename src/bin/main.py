@@ -71,6 +71,9 @@ def create_nn(
             model.add(GlobalMaxPooling1D())
         else:
             model.add(Flatten())
+    for n_hidden in hidden_units:
+        model.add(Dropout(dropout_rate))
+        model.add(SeparableConv1D(n_hidden, 3, padding='same', activation='relu'))
     if n_classes is not None:
         model.add(Dropout(dropout_rate))
         if n_classes == 2:
@@ -238,9 +241,16 @@ def main(args: Namespace):
                     ]
                 ])
                 y_src_train_split = np.concatenate([y_src_train_split, np.full(n_resample, lbl)])
+        shuffled_idxs = np.arange(len(X_src_train_tensor))
+        np.random.shuffle(shuffled_idxs)
+        X_src_train_tensor = X_src_train_tensor[shuffled_idxs]
+        y_src_train_split = y_src_train_split[shuffled_idxs]
 
         # For each pooling approach
         for t_pooling in GlobalPooling:
+            # Log start
+            print(f"Current config: Feature type -> {feature}, pooling type -> {t_pooling.value}")
+
             # Search for best DNN config given the features
             cv = GridSearchCV(
                 estimator=KerasClassifier(
@@ -249,7 +259,7 @@ def main(args: Namespace):
                     optimizer="adam",
                     metrics=['accuracy'],
                     epochs=150,
-                    batch_size=8,
+                    batch_size=16,
                     validation_split=0.2,
                     verbose=0,
                     callbacks=[EarlyStopping(monitor='val_accuracy', patience=5)]
@@ -258,15 +268,17 @@ def main(args: Namespace):
                     'model__input_shape': [X_src_train_tensor.shape[1:]],
                     'model__pooling': [t_pooling],
                     'model__hidden_units': [
-                        [512], [512, 512], [512, 512, 512], [1024], [1024, 1024], [1024, 1024, 1024]
+                        # [512], [512, 512], [512, 512, 512], [1024], [1024, 1024], [1024, 1024, 1024]
+                        [512], [512, 512], [1024], [1024, 1024]
                     ],
                     'model__dropout_rate': [0.1, 0.333],
                     'optimizer__learning_rate': [1e-3, 1e-4]
-                }
+                },
+                n_jobs=1
             )
             cv.fit(X_src_train_tensor, y_src_train_split)
 
-            # Retain best classifier and compute the test scores
+            # Retain best classifier
             base_cls = cv.best_estimator_
 
             # Fit adapter version
@@ -275,10 +287,10 @@ def main(args: Namespace):
                     input_shape=X_src_train_tensor.shape[1:],
                     n_classes=None,
                     hidden_units=cv.best_params_['model__hidden_units'],
+                    pooling=t_pooling,
                     dropout_rate=cv.best_params_['model__dropout_rate']
                 ),
                 task=create_nn(
-                    pooling=t_pooling,
                     dropout_rate=cv.best_params_['model__dropout_rate']
                 ),
                 optimizer=Adam(learning_rate=cv.best_params_['optimizer__learning_rate']),
@@ -296,53 +308,44 @@ def main(args: Namespace):
             )
             adapter.fit(X_src_train_tensor, y_src_train_split)
 
+            # Evaluate models
             for do_adaptation, cls in zip([False, True], [base_cls, adapter]):
-                try:
-                    # Get predictions
-                    if do_adaptation:
-                        y_src_test_pred = (cls.predict(X_src_test_tensor) >= 0.5).astype(int).reshape(-1)
-                        y_src_test_proba = cls.predict(X_src_test_tensor).reshape(-1)
-                        y_tgt_pred = (cls.predict(X_tgt_tensor) >= 0.5).astype(int)
-                        y_tgt_proba = cls.predict(X_tgt_tensor).reshape(-1).reshape(-1)
-                    else:
-                        y_src_test_pred = cls.predict(X_src_test_tensor)
-                        y_src_test_proba = cls.predict_proba(X_src_test_tensor)[:, 1]
-                        y_tgt_pred = cls.predict(X_tgt_tensor)
-                        y_tgt_proba = cls.predict_proba(X_tgt_tensor)[:, 1]
+                # Get predictions
+                if do_adaptation:
+                    y_src_test_pred = (cls.predict(X_src_test_tensor) >= 0.5).astype(int).reshape(-1)
+                    y_src_test_proba = cls.predict(X_src_test_tensor).reshape(-1)
+                    y_tgt_pred = (cls.predict(X_tgt_tensor) >= 0.5).astype(int)
+                    y_tgt_proba = cls.predict(X_tgt_tensor).reshape(-1).reshape(-1)
+                else:
+                    y_src_test_pred = cls.predict(X_src_test_tensor)
+                    y_src_test_proba = cls.predict_proba(X_src_test_tensor)[:, 1]
+                    y_tgt_pred = cls.predict(X_tgt_tensor)
+                    y_tgt_proba = cls.predict_proba(X_tgt_tensor)[:, 1]
 
-                    # Test classifier (on source data)
-                    src_cls_report = classification_report(y_src_test_split, y_src_test_pred)
-                    src_accuracy_score = accuracy_score(y_src_test_split, y_src_test_pred)
-                    src_precision_score, src_recall_score, src_fscore, src_support = precision_recall_fscore_support(
-                        y_src_test_split, y_src_test_pred, average='macro'
-                    )
-                    src_specificity_score = recall_score(y_src_test_split, y_src_test_pred, average='macro', pos_label=0)
-                    src_auc_score = roc_auc_score(y_src_test_split, y_src_test_proba)
-                    src_fpr, src_tpr, src_roc_threshold = roc_curve(y_src_test_split, y_src_test_proba)
-                    src_pr, src_rc, src_pr_rc_threshold = precision_recall_curve(y_src_test_split, y_src_test_proba)
-                    src_confusion_matrix = confusion_matrix(y_src_test_split, y_src_test_pred)
+                # Test classifier (on source data)
+                src_cls_report = classification_report(y_src_test_split, y_src_test_pred)
+                src_accuracy_score = accuracy_score(y_src_test_split, y_src_test_pred)
+                src_precision_score, src_recall_score, src_fscore, src_support = precision_recall_fscore_support(
+                    y_src_test_split, y_src_test_pred, average='macro'
+                )
+                src_specificity_score = recall_score(y_src_test_split, y_src_test_pred, average='macro', pos_label=0)
+                src_auc_score = roc_auc_score(y_src_test_split, y_src_test_proba)
+                src_fpr, src_tpr, src_roc_threshold = roc_curve(y_src_test_split, y_src_test_proba)
+                src_pr, src_rc, src_pr_rc_threshold = precision_recall_curve(y_src_test_split, y_src_test_proba)
+                src_confusion_matrix = confusion_matrix(y_src_test_split, y_src_test_pred)
 
-                    # Test classifier (on target data)
-                    tgt_cls_report = classification_report(y_tgt_labels_split, y_tgt_pred)
-                    tgt_accuracy_score = accuracy_score(y_tgt_labels_split, y_tgt_pred)
-                    tgt_precision_score, tgt_recall_score, tgt_fscore, tgt_support = precision_recall_fscore_support(
-                        y_tgt_labels_split, y_tgt_pred, average='macro'
-                    )
-                    tgt_specificity_score = recall_score(y_tgt_labels_split, y_tgt_pred, average='macro', pos_label=0)
-                    tgt_auc_score = roc_auc_score(y_tgt_labels_split, y_tgt_proba)
-                    tgt_fpr, tgt_tpr, tgt_roc_threshold = roc_curve(y_tgt_labels_split, y_tgt_proba)
-                    tgt_pr, tgt_rc, tgt_pr_rc_threshold = precision_recall_curve(y_tgt_labels_split, y_tgt_proba)
+                # Test classifier (on target data)
+                tgt_cls_report = classification_report(y_tgt_labels_split, y_tgt_pred)
+                tgt_accuracy_score = accuracy_score(y_tgt_labels_split, y_tgt_pred)
+                tgt_precision_score, tgt_recall_score, tgt_fscore, tgt_support = precision_recall_fscore_support(
+                    y_tgt_labels_split, y_tgt_pred, average='macro'
+                )
+                tgt_specificity_score = recall_score(y_tgt_labels_split, y_tgt_pred, average='macro', pos_label=0)
+                tgt_auc_score = roc_auc_score(y_tgt_labels_split, y_tgt_proba)
+                tgt_fpr, tgt_tpr, tgt_roc_threshold = roc_curve(y_tgt_labels_split, y_tgt_proba)
+                tgt_pr, tgt_rc, tgt_pr_rc_threshold = precision_recall_curve(y_tgt_labels_split, y_tgt_proba)
 
-                    tgt_confusion_matrix = confusion_matrix(y_tgt_labels_split, y_tgt_pred)
-                except Exception as e:
-                    print(e)
-                    src_cls_report = ''
-                    src_accuracy_score = src_specificity_score = src_auc_score = src_precision_score = src_recall_score = src_fscore = src_support = None
-                    src_fpr = src_tpr = src_roc_threshold = src_pr = src_rc = src_pr_rc_threshold = src_confusion_matrix = np.array([None])
-                    tgt_cls_report = ''
-                    tgt_accuracy_score = tgt_specificity_score = tgt_auc_score = tgt_precision_score = tgt_recall_score = tgt_fscore = tgt_support = None
-                    tgt_fpr = tgt_tpr = tgt_roc_threshold = tgt_pr = tgt_rc = tgt_pr_rc_threshold = tgt_confusion_matrix = np.array([None])
-
+                tgt_confusion_matrix = confusion_matrix(y_tgt_labels_split, y_tgt_pred)
                 # Log results
                 with open(output_file_path, 'a') as f:
                     print(f"Feature type: {feature}, pooling type: {t_pooling.value}, domain adaptation: {do_adaptation}\n", file=f)
