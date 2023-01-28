@@ -200,6 +200,44 @@ def main(args: Namespace):
             # Do standardisation
             std_scaler_tgt: StandardScaler = StandardScaler()
             X_tgt_vector: np.ndarray = std_scaler_tgt.fit_transform(X_tgt_vector)
+            X_tgt_train_vector: np.ndarray = std_scaler_tgt.fit_transform(X_tgt_vector)
+
+            # Apply minority oversampling to balance the source training data
+            lbl_ids, counts = np.unique(y_src_train_split, return_counts=True)
+            majority_count = counts.max()
+            for lbl, count in zip(lbl_ids, counts):
+                if count < majority_count:
+                    n_resample = majority_count - count
+                    X_src_train_vector = np.vstack([
+                        X_src_train_vector,
+                        X_src_train_vector[
+                            np.random.choice(
+                                np.arange(len(X_src_train_vector))[y_src_train_split == lbl], size=n_resample
+                            )
+                        ]
+                    ])
+                    y_src_train_split = np.concatenate([y_src_train_split, np.full(n_resample, lbl)])
+            shuffled_idxs = np.arange(len(X_src_train_vector))
+            np.random.shuffle(shuffled_idxs)
+            X_src_train_vector = X_src_train_vector[shuffled_idxs]
+            y_src_train_split = y_src_train_split[shuffled_idxs]
+            # Apply minority oversampling to balance the target training data
+            lbl_ids, counts = np.unique(y_tgt_labels_split, return_counts=True)
+            majority_count = counts.max()
+            for lbl, count in zip(lbl_ids, counts):
+                if count < majority_count:
+                    n_resample = majority_count - count
+                    X_tgt_train_vector = np.vstack([
+                        X_tgt_train_vector,
+                        X_tgt_train_vector[
+                            np.random.choice(
+                                np.arange(len(X_tgt_train_vector))[y_tgt_labels_split == lbl], size=n_resample
+                            )
+                        ]
+                    ])
+            shuffled_idxs = np.arange(len(X_tgt_train_vector))
+            np.random.shuffle(shuffled_idxs)
+            X_tgt_train_vector = X_tgt_train_vector[shuffled_idxs]
 
             # Search for best DNN config given the features
             cv = GridSearchCV(
@@ -243,7 +281,7 @@ def main(args: Namespace):
                 optimizer_enc=Adam(learning_rate=cv.best_params_['optimizer__learning_rate']),
                 loss='binary_crossentropy',
                 lambda_=0.1,
-                Xt=X_tgt_vector,
+                Xt=X_tgt_train_vector,
                 metrics=['accuracy'],
                 validation_split=0.2,
                 epochs=150,
@@ -304,6 +342,7 @@ def main(args: Namespace):
 
                 # Log results
                 with open(output_file_path, 'a') as f:
+                    print(f"Best configs:\n\t{cv.best_params_}", file=f)
                     print(f"Feature type: {feature}, pooling type: {t_pooling.value}, domain adaptation: {do_adaptation}\n", file=f)
                     print("Source language classification results\n", file=f)
                     print(f"Classification report: \n{src_cls_report}\n", file=f)
