@@ -256,15 +256,16 @@ def main(args: Namespace):
                     'model__input_shape': [X_src_train_vector.shape[1:]],
                     # 'model__hidden_units': [[256], [256, 256], [512], [512, 512], [1024], [1024, 1024]],
                     'model__hidden_units': [
-                        [512], [512, 512], [512, 512, 512], [1024], [1024, 1024], [1024, 1024, 1024]
+                        # [512], [512, 512], [512, 512, 512], [1024], [1024, 1024], [1024, 1024, 1024]
+                        [512], [512, 512], [768], [768, 768], [1024], [1024, 1024]
                     ],
                     'model__dropout_rate': [0.1, 0.333],
-                    'optimizer__learning_rate': [1e-3, 1e-4]
+                    'optimizer__learning_rate': [1e-3, 5e-4]
                 }
             )
             cv.fit(X_src_train_vector, y_src_train_split)
 
-            # Retain best classifier and compute the test scores
+            # Retain the best classifier and compute the test scores
             base_cls = cv.best_estimator_
 
             adapter = DeepCORAL(
