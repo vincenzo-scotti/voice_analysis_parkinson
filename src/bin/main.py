@@ -39,7 +39,7 @@ from features import GlobalPooling, FEATURE_EXTRACTORS, trunc_audio
 
 from tensorflow.keras import Sequential
 from tensorflow.keras.layers import Input, SeparableConv1D, Dense, Flatten
-from tensorflow.keras.layers import GlobalMaxPooling1D, GlobalAveragePooling1D
+from tensorflow.keras.layers import GlobalMaxPooling1D, GlobalAveragePooling1D, MaxPooling1D
 from tensorflow.keras.layers import Dropout
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping
@@ -50,8 +50,10 @@ def create_nn(
         input_shape: Optional[Tuple[int]] = None,
         n_classes: Optional[int] = 2,
         hidden_units: Optional[Union[int, List[int]]] = None,
-        pooling: Optional[GlobalPooling] = None,
-        dropout_rate: float = 0.1
+        kernel_size: int = 3,
+        global_pooling: Optional[GlobalPooling] = None,
+        dropout_rate: float = 0.1,
+        pooling: bool = False
 ):
     if hidden_units is None:
         hidden_units = []
@@ -63,17 +65,16 @@ def create_nn(
         model.add(Input(shape=input_shape))
     for n_hidden in hidden_units:
         model.add(Dropout(dropout_rate))
-        model.add(SeparableConv1D(n_hidden, 3, padding='same', activation='relu'))
-    if pooling is not None:
-        if pooling == GlobalPooling.AVERAGE:
+        model.add(SeparableConv1D(n_hidden, kernel_size, padding='same', activation='relu'))
+        if pooling:
+            model.add(MaxPooling1D(max(2, kernel_size - 1)))
+    if global_pooling is not None:
+        if global_pooling == GlobalPooling.AVERAGE:
             model.add(GlobalAveragePooling1D())
-        elif pooling == GlobalPooling.MAXIMUM:
+        elif global_pooling == GlobalPooling.MAXIMUM:
             model.add(GlobalMaxPooling1D())
         else:
             model.add(Flatten())
-    for n_hidden in hidden_units:
-        model.add(Dropout(dropout_rate))
-        model.add(SeparableConv1D(n_hidden, 3, padding='same', activation='relu'))
     if n_classes is not None:
         model.add(Dropout(dropout_rate))
         if n_classes == 2:
@@ -227,6 +228,7 @@ def main(args: Namespace):
         X_tgt_tensor: np.ndarray = std_scaler_tgt.fit_transform(
             X_tgt_tensor.reshape(-1, tmp_n_channels)
         ).reshape(tmp_n_samples, -1, tmp_n_channels)
+        X_tgt_train_tensor: np.ndarray = X_tgt_tensor.copy()
 
         # Apply minority oversampling to balance the source training data
         lbl_ids, counts = np.unique(y_src_train_split, return_counts=True)
@@ -245,6 +247,21 @@ def main(args: Namespace):
         np.random.shuffle(shuffled_idxs)
         X_src_train_tensor = X_src_train_tensor[shuffled_idxs]
         y_src_train_split = y_src_train_split[shuffled_idxs]
+        # Apply minority oversampling to balance the target training data
+        lbl_ids, counts = np.unique(y_tgt_labels_split, return_counts=True)
+        majority_count = counts.max()
+        for lbl, count in zip(lbl_ids, counts):
+            if count < majority_count:
+                n_resample = majority_count - count
+                X_tgt_train_tensor = np.vstack([
+                    X_tgt_train_tensor,
+                    X_tgt_tensor[
+                        np.random.choice(np.arange(len(X_tgt_tensor))[y_tgt_labels_split == lbl], size=n_resample)
+                    ]
+                ])
+        shuffled_idxs = np.arange(len(X_tgt_train_tensor))
+        np.random.shuffle(shuffled_idxs)
+        X_tgt_train_tensor = X_tgt_train_tensor[shuffled_idxs]
 
         # For each pooling approach
         for t_pooling in GlobalPooling:
@@ -266,13 +283,17 @@ def main(args: Namespace):
                 ),
                 param_grid={
                     'model__input_shape': [X_src_train_tensor.shape[1:]],
-                    'model__pooling': [t_pooling],
                     'model__hidden_units': [
                         # [512], [512, 512], [512, 512, 512], [1024], [1024, 1024], [1024, 1024, 1024]
-                        [512], [512, 512], [1024], [1024, 1024]
+                        [512], [512, 512], [768], [768, 768], [1024], [1024, 1024]
                     ],
-                    'model__dropout_rate': [0.1, 0.333],
-                    'optimizer__learning_rate': [1e-3, 1e-4]
+                    # 'model__dropout_rate': [0.1, 0.333],
+                    'model__kernel_size': [
+                        5 if feature in {'wav2vec', 'spectral'} and t_pooling == GlobalPooling.FLATTENING else 3
+                    ],
+                    'model__pooling': [feature in {'wav2vec', 'spectral'} and t_pooling == GlobalPooling.FLATTENING],
+                    'model__global_pooling': [t_pooling],
+                    'optimizer__learning_rate': [1e-3, 5e-4]
                 },
                 n_jobs=1
             )
@@ -287,22 +308,24 @@ def main(args: Namespace):
                     input_shape=X_src_train_tensor.shape[1:],
                     n_classes=None,
                     hidden_units=cv.best_params_['model__hidden_units'],
-                    pooling=t_pooling,
-                    dropout_rate=cv.best_params_['model__dropout_rate']
+                    kernel_size=cv.best_params_['model__kernel_size'],
+                    pooling=cv.best_params_['model__pooling'],
+                    global_pooling=t_pooling  # ,
+                    # dropout_rate=cv.best_params_['model__dropout_rate']
                 ),
                 task=create_nn(
-                    dropout_rate=cv.best_params_['model__dropout_rate']
+                    # dropout_rate=cv.best_params_['model__dropout_rate']
                 ),
                 optimizer=Adam(learning_rate=cv.best_params_['optimizer__learning_rate']),
                 optimizer_enc=Adam(learning_rate=cv.best_params_['optimizer__learning_rate']),
                 loss='binary_crossentropy',
                 lambda_=0.1,
-                Xt=X_tgt_tensor,
+                Xt=X_tgt_train_tensor,
                 metrics=['accuracy'],
                 validation_split=0.2,
                 epochs=150,
                 random_state=configs.get('random_seed', None),
-                batch_size=8,
+                batch_size=16,
                 verbose=0,
                 callbacks=[EarlyStopping(monitor='val_accuracy', patience=5)]
             )
@@ -390,10 +413,10 @@ def main(args: Namespace):
                     (feature, t_pooling.value, do_adaptation, 'tgt', 'pr_rc_thresholds', tgt_pr_rc_threshold.tolist()),
                     (feature, t_pooling.value, do_adaptation, 'tgt', 'confusion_matrix', tgt_confusion_matrix.tolist())
                 ]
-    # Create data frame with measured scores
-    df: pd.DataFrame = pd.DataFrame(score_data, columns=score_cols)
-    # Save data frame
-    df.to_csv(scores_file_path, index=False)
+                # Create data frame with measured scores (update at each evaluation)
+                df: pd.DataFrame = pd.DataFrame(score_data, columns=score_cols)
+                # Save data frame
+                df.to_csv(scores_file_path, index=False)
 
     return 0
 
