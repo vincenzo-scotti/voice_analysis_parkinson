@@ -20,6 +20,7 @@ from typing import List, Dict, Union, Tuple, Optional
 
 import numpy as np
 import pandas as pd
+import math
 
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.metrics import (
@@ -39,11 +40,19 @@ from features import GlobalPooling, FEATURE_EXTRACTORS, trunc_audio
 
 from tensorflow.keras import Sequential
 from tensorflow.keras.layers import Input, SeparableConv1D, Dense, Flatten
-from tensorflow.keras.layers import GlobalMaxPooling1D, GlobalAveragePooling1D, MaxPooling1D
+from tensorflow.keras.layers import GlobalMaxPooling1D, GlobalAveragePooling1D, MaxPooling1D, AveragePooling1D
 from tensorflow.keras.layers import Dropout
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping
 from scikeras.wrappers import KerasClassifier
+
+
+# Constants
+N_EPOCHS = 150
+VALIDATION_SPLIT = 0.2
+BATCH_SIZE = 16
+E_STOP_PATIENCE = 5
+CORAL_LAMBDA = 0.1
 
 
 def create_nn(
@@ -53,7 +62,8 @@ def create_nn(
         kernel_size: int = 3,
         global_pooling: Optional[GlobalPooling] = None,
         dropout_rate: float = 0.1,
-        pooling: bool = False
+        pooling: bool = False,
+        input_spatial_reduction: Optional[Union[int, float]] = None
 ):
     if hidden_units is None:
         hidden_units = []
@@ -63,11 +73,17 @@ def create_nn(
     model = Sequential()
     if input_shape is not None:
         model.add(Input(shape=input_shape))
+    if input_spatial_reduction is not None:
+        if isinstance(input_spatial_reduction, float):
+            input_spatial_reduction = int(math.ceil(input_spatial_reduction * input_shape[0]))
+        model.add(AveragePooling1D(
+            pool_size=2 * input_spatial_reduction, strides=input_spatial_reduction, padding='same')
+        )
     for n_hidden in hidden_units:
         model.add(Dropout(dropout_rate))
         model.add(SeparableConv1D(n_hidden, kernel_size, padding='same', activation='relu'))
         if pooling:
-            model.add(MaxPooling1D(max(2, kernel_size - 1)))
+            model.add(MaxPooling1D(pool_size=max(2, kernel_size - 1)))
     if global_pooling is not None:
         if global_pooling == GlobalPooling.AVERAGE:
             model.add(GlobalAveragePooling1D())
@@ -172,7 +188,7 @@ def main(args: Namespace):
             (x, y, d) for x, y, d in zip(X_tgt, y_tgt_labels, X_tgt_duration) if x is not None
         ])]
 
-        # Apply chunking to all feature maps and and train-test splitting to source data
+        # Apply chunking to all feature maps and train-test splitting to source data
         X_src_train, y_src_train_split = list(zip(*sum([
             trunc_audio(X, y, d, chunk_len=configs.get('chunk_duration', 4.0))
             for X, y, d in zip(X_src_train_tmp, y_src_train_tmp, X_src_train_duration_tmp)
@@ -266,8 +282,7 @@ def main(args: Namespace):
         # For each pooling approach
         for t_pooling in GlobalPooling:
             # Log start
-            print(f"Current config: Feature type -> {feature}, pooling type -> {t_pooling.value}")
-
+            print(f"Current configuration:\n\tFeature type: {feature}\n\tpooling type: {t_pooling.value}")
             # Search for best DNN config given the features
             cv = GridSearchCV(
                 estimator=KerasClassifier(
@@ -275,23 +290,20 @@ def main(args: Namespace):
                     loss="binary_crossentropy",
                     optimizer="adam",
                     metrics=['accuracy'],
-                    epochs=150,
-                    batch_size=16,
-                    validation_split=0.2,
+                    epochs=N_EPOCHS,
+                    batch_size=BATCH_SIZE,
+                    validation_split=VALIDATION_SPLIT,
                     verbose=0,
-                    callbacks=[EarlyStopping(monitor='val_accuracy', patience=5)]
+                    callbacks=[EarlyStopping(monitor='val_accuracy', patience=E_STOP_PATIENCE)]
                 ),
                 param_grid={
                     'model__input_shape': [X_src_train_tensor.shape[1:]],
                     'model__hidden_units': [
-                        # [512], [512, 512], [512, 512, 512], [1024], [1024, 1024], [1024, 1024, 1024]
-                        [512], [512, 512], [768], [768, 768], [1024], [1024, 1024]
+                        [512], [512, 512], [512, 512, 512], [1024], [1024, 1024], [1024, 1024, 1024]
                     ],
-                    # 'model__dropout_rate': [0.1, 0.333],
-                    'model__kernel_size': [
-                        5 if feature in {'wav2vec', 'spectral'} and t_pooling == GlobalPooling.FLATTENING else 3
+                    'model__input_spatial_reduction': [
+                        32 if feature in {'wav2vec', 'spectral'} and t_pooling == GlobalPooling.FLATTENING else None
                     ],
-                    'model__pooling': [feature in {'wav2vec', 'spectral'} and t_pooling == GlobalPooling.FLATTENING],
                     'model__global_pooling': [t_pooling],
                     'optimizer__learning_rate': [1e-3, 5e-4]
                 },
@@ -302,6 +314,8 @@ def main(args: Namespace):
             # Retain best classifier
             base_cls = cv.best_estimator_
 
+            print("Base classifier trained")
+
             # Fit adapter version
             adapter = DeepCORAL(
                 encoder=create_nn(
@@ -309,27 +323,26 @@ def main(args: Namespace):
                     n_classes=None,
                     hidden_units=cv.best_params_['model__hidden_units'],
                     kernel_size=cv.best_params_['model__kernel_size'],
-                    pooling=cv.best_params_['model__pooling'],
-                    global_pooling=t_pooling  # ,
-                    # dropout_rate=cv.best_params_['model__dropout_rate']
+                    global_pooling=t_pooling,
+                    input_spatial_reduction=cv.best_params_['model__input_spatial_reduction']
                 ),
-                task=create_nn(
-                    # dropout_rate=cv.best_params_['model__dropout_rate']
-                ),
+                task=create_nn(),
                 optimizer=Adam(learning_rate=cv.best_params_['optimizer__learning_rate']),
                 optimizer_enc=Adam(learning_rate=cv.best_params_['optimizer__learning_rate']),
                 loss='binary_crossentropy',
-                lambda_=0.1,
+                lambda_=CORAL_LAMBDA,
                 Xt=X_tgt_train_tensor,
                 metrics=['accuracy'],
-                validation_split=0.2,
-                epochs=150,
+                validation_split=VALIDATION_SPLIT,
+                epochs=N_EPOCHS,
                 random_state=configs.get('random_seed', None),
-                batch_size=16,
+                batch_size=BATCH_SIZE,
                 verbose=0,
-                callbacks=[EarlyStopping(monitor='val_accuracy', patience=5)]
+                callbacks=[EarlyStopping(monitor='val_accuracy', patience=E_STOP_PATIENCE)]
             )
             adapter.fit(X_src_train_tensor, y_src_train_split)
+
+            print("Adapted classifier trained")
 
             # Evaluate models
             for do_adaptation, cls in zip([False, True], [base_cls, adapter]):
@@ -351,7 +364,7 @@ def main(args: Namespace):
                 src_precision_score, src_recall_score, src_fscore, src_support = precision_recall_fscore_support(
                     y_src_test_split, y_src_test_pred, average='macro'
                 )
-                src_specificity_score = recall_score(y_src_test_split, y_src_test_pred, average='macro', pos_label=0)
+                src_specificity_score = recall_score(y_src_test_split, y_src_test_pred, pos_label=0)
                 src_auc_score = roc_auc_score(y_src_test_split, y_src_test_proba)
                 src_fpr, src_tpr, src_roc_threshold = roc_curve(y_src_test_split, y_src_test_proba)
                 src_pr, src_rc, src_pr_rc_threshold = precision_recall_curve(y_src_test_split, y_src_test_proba)
@@ -363,7 +376,7 @@ def main(args: Namespace):
                 tgt_precision_score, tgt_recall_score, tgt_fscore, tgt_support = precision_recall_fscore_support(
                     y_tgt_labels_split, y_tgt_pred, average='macro'
                 )
-                tgt_specificity_score = recall_score(y_tgt_labels_split, y_tgt_pred, average='macro', pos_label=0)
+                tgt_specificity_score = recall_score(y_tgt_labels_split, y_tgt_pred, pos_label=0)
                 tgt_auc_score = roc_auc_score(y_tgt_labels_split, y_tgt_proba)
                 tgt_fpr, tgt_tpr, tgt_roc_threshold = roc_curve(y_tgt_labels_split, y_tgt_proba)
                 tgt_pr, tgt_rc, tgt_pr_rc_threshold = precision_recall_curve(y_tgt_labels_split, y_tgt_proba)
