@@ -322,7 +322,6 @@ def main(args: Namespace):
                     input_shape=X_src_train_tensor.shape[1:],
                     n_classes=None,
                     hidden_units=cv.best_params_['model__hidden_units'],
-                    kernel_size=cv.best_params_['model__kernel_size'],
                     global_pooling=t_pooling,
                     input_spatial_reduction=cv.best_params_['model__input_spatial_reduction']
                 ),
