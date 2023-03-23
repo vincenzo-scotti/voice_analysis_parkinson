@@ -6,7 +6,7 @@ Data set(s) are available at the following links:
 - English:
     - [MDVR-KCL](https://zenodo.org/record/2867216#.YpSK3i0QPT9): Dataset of Mobile Device Voice Recordings at King's College London from both early and advanced Parkinson's disease patients hosted by [Zenodo](https://zenodo.org)
 - Telugu:
-    - [Parkison corpus in Hindi](https://drive.google.com/drive/folders/1lBz_NhtP0o0uy3OMV6FAtTHkaA4Prmf-?usp=share_link): Private collection of voice recordings of Parkinson's disease patients in Hindi hosted by [Prof. Anitha S.Pillai](https://www.linkedin.com/in/anithaspillai/)
+    - [Parkison corpus in Telugu](https://drive.google.com/drive/folders/1lBz_NhtP0o0uy3OMV6FAtTHkaA4Prmf-?usp=share_link): Private collection of voice recordings of Parkinson's disease patients in Hindi hosted by [Prof. Anitha S.Pillai](https://www.linkedin.com/in/anithaspillai/)
     - [OpenSLR Telugu split](https://www.aclweb.org/anthology/2020.lrec-1.800): Voice recordings in Telugu of people uttering sentences for ASR development hosted by [OpenSLR](https://www.openslr.org/66/)
 - Italian:
     - [Italian Parkinson's Voice and Speech](https://ieee-dataport.org/open-access/italian-parkinsons-voice-and-speech): Voice recordings of Italian Parkinson's disease patients and healthy individuals, hosted by [IEEE Data Port](https://ieee-dataport.org/)
@@ -31,7 +31,7 @@ Directory structure:
         |- 26-29_09_2017_KCL/
           |- metadata.csv (for preprocessing script)
           |- ... (original directory structure from MDVR-KCL)
-      |- hi/
+      |- te/
         |- asp/
           |- Parkinson's voice/
             |- metadata.csv (for denoising script)
