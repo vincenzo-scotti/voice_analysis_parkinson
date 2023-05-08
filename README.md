@@ -1,6 +1,6 @@
 # Voice Analysis for Parkinson's Disease
 
-Codebase for the papers "[An Analysis of Features for Machine Learning Approaches to Parkinson's Disease Detection](https://www.overleaf.com/read/dfzwqkspnxxp)" and "[Cross-Lingual Transferability of Voice Analysis Models: a Parkinson's Disease Case Study]()" ([extended abstract](https://www.overleaf.com/read/wtjyqvpnngwg)). 
+Codebase for the papers "[An Analysis of Features for Machine Learning Approaches to Parkinson's Disease Detection](https://www.overleaf.com/read/dfzwqkspnxxp)" and "[Cross-Lingual Transferability of Voice Analysis Models: a Parkinson's Disease Case Study](https://www.overleaf.com/read/yryxdcgzgprv)" ([extended abstract](https://www.overleaf.com/read/wtjyqvpnngwg)). 
 For all the references, contributions and credits, please refer to the paper.
 
 This code was initially developed as part of the M.Sc. Thesis in Computer Science and Engineering "[Cross-Lingual Transferability of Voice Analysis Models: a Parkinson's Disease Case Study](https://www.overleaf.com/read/tkbjcxxjrzjb)" ([executive summary](https://www.overleaf.com/read/qdszgphmhcsd)).
@@ -85,7 +85,9 @@ If you are willing to use our code or our models, please cite our work through t
 ```bibtex
 
 ```
+```bibtex
 
+```
 ```bibtex
 
 ```
