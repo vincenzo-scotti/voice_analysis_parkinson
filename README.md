@@ -86,8 +86,28 @@ If you are willing to use our code or our models, please cite our work through t
 
 ```
 ```bibtex
-
+@inbook{ferrante-etal-2023-analysis,
+	address = {Boca Raton},
+	author = {Ferrante, Claudio and Menon, Bindu and Pillai, Anitha S. and Sbattella, Licia and Scotti, Vincenzo},
+	booktitle = {Machine Learning and Deep Learning in Natural Language Processing},
+	doi = {10.1201/9781003296126-13},
+	editor = {Pillai, Anitha S. and Tedesco, Roberto},
+	isbn = {978-1-003-29612-6},
+	pages = {169--183},
+	publisher = {CRC Press},
+	title = {An Analysis of Features for Machine Learning Approaches to Parkinson's Disease Detection},
+	url = {https://doi.org/10.1201/9781003296126-13},
+	year = {2023},
+}
 ```
 ```bibtex
-
+@conference{ferrante-scotti-2023-cross,
+	author = {Ferrante, Claudio and Scotti, Vincenzo},
+	booktitle = {Booklet of abstracts -- SPOKEN LANGUAGE IN THE MEDICAL FIELD: Linguistic analysis, technological applications and clinical tools},
+	date-modified = {2023-07-24 13:58:37 +0200},
+	pages = {40--42},
+	title = {Cross-lingual transferability of voice analysis models: a Parkinson's Disease case study},
+	url = {https://www.aisv.it/lecce2023/BookOfAbstract_Lecce2023.pdf#page=40},
+	year = {2023}
+}
 ```
