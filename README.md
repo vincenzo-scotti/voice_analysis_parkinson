@@ -104,7 +104,6 @@ If you are willing to use our code or our models, please cite our work through t
 @conference{ferrante-scotti-2023-cross,
 	author = {Ferrante, Claudio and Scotti, Vincenzo},
 	booktitle = {Booklet of abstracts -- SPOKEN LANGUAGE IN THE MEDICAL FIELD: Linguistic analysis, technological applications and clinical tools},
-	date-modified = {2023-07-24 13:58:37 +0200},
 	pages = {40--42},
 	title = {Cross-lingual transferability of voice analysis models: a Parkinson's Disease case study},
 	url = {https://www.aisv.it/lecce2023/BookOfAbstract_Lecce2023.pdf#page=40},
