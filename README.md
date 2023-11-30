@@ -78,7 +78,7 @@ To run the script in background:
 nohup python ./src/bin/main.py --configs_file_path ./resources/configs/path/to/config.yaml > experiment_"$(date '+%Y_%m_%d_%H_%M_%S')".out &
 ``` 
 
-## Contributors
+## Contributors
 
 - Claudio Ferrante ([claudio.ferrante@mail.polimi.it](mailto:claudio.ferrante@mail.polimi.it))
 - Vincenzo Scotti ([vincenzo.scotti@polimi.it](mailto:vincenzo.scotti@polimi.it))
